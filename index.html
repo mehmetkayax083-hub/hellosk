@@ -2,104 +2,311 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pomodoro Zamanlayıcı</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0e0f1e">
+  <title>Focus Flow · Pomodoro</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body data-mode="focus">
-  <main class="card">
-    <header class="header">
-      <h1 class="title">Pomodoro</h1>
-      <div class="header-actions">
-        <button class="icon-btn" id="themeBtn" aria-label="Temayı değiştir" title="Tema (koyu/açık)">
-          <span class="icon-theme"></span>
-        </button>
-        <button class="icon-btn" id="settingsBtn" aria-label="Ayarlar" title="Ayarlar">
-          <span class="icon-gear"></span>
-        </button>
+<body data-view="timer" data-mode="focus" data-theme="dark">
+  <div class="app">
+    <!-- Yan menü (masaüstü) / üst kimlik -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Focus&nbsp;Flow</span>
       </div>
-    </header>
 
-    <nav class="modes" role="tablist" aria-label="Mod seçimi">
-      <button class="mode-btn active" role="tab" aria-selected="true" data-mode="focus">Odaklanma</button>
-      <button class="mode-btn" role="tab" aria-selected="false" data-mode="short">Kısa Mola</button>
-      <button class="mode-btn" role="tab" aria-selected="false" data-mode="long">Uzun Mola</button>
+      <nav class="nav" aria-label="Ana gezinme">
+        <button class="nav-item active" data-nav="timer" aria-current="page">
+          <span class="nav-ico i-timer" aria-hidden="true"></span>
+          <span class="nav-label">Zamanlayıcı</span>
+        </button>
+        <button class="nav-item" data-nav="tasks">
+          <span class="nav-ico i-tasks" aria-hidden="true"></span>
+          <span class="nav-label">Görevler</span>
+        </button>
+        <button class="nav-item" data-nav="stats">
+          <span class="nav-ico i-stats" aria-hidden="true"></span>
+          <span class="nav-label">İstatistik</span>
+        </button>
+        <button class="nav-item" data-nav="settings">
+          <span class="nav-ico i-settings" aria-hidden="true"></span>
+          <span class="nav-label">Ayarlar</span>
+        </button>
+      </nav>
+
+      <div class="streak-badge" id="streakBadge" title="Günlük seri">
+        <span class="streak-flame" aria-hidden="true"></span>
+        <span><strong id="streakCount">0</strong> günlük seri</span>
+      </div>
+    </aside>
+
+    <main class="content">
+      <!-- ZAMANLAYICI -->
+      <section class="view view-timer" data-view-panel="timer">
+        <p class="motivation" id="motivation"></p>
+
+        <div class="modes" role="tablist" aria-label="Mod seçimi">
+          <button class="mode-btn active" role="tab" aria-selected="true" data-mode="focus">Odaklanma</button>
+          <button class="mode-btn" role="tab" aria-selected="false" data-mode="short">Kısa Mola</button>
+          <button class="mode-btn" role="tab" aria-selected="false" data-mode="long">Uzun Mola</button>
+        </div>
+
+        <div class="dial">
+          <svg class="dial-svg" viewBox="0 0 260 260" aria-hidden="true">
+            <defs>
+              <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="var(--accent-a)" />
+                <stop offset="100%" stop-color="var(--accent-b)" />
+              </linearGradient>
+            </defs>
+            <circle class="dial-track" cx="130" cy="130" r="120" />
+            <circle class="dial-bar" id="dialBar" cx="130" cy="130" r="120" />
+          </svg>
+          <div class="dial-inner">
+            <div class="time" id="time" aria-live="polite" role="timer">25:00</div>
+            <div class="phase" id="phase">Odaklanma</div>
+            <div class="cycle-dots" id="cycleDots" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <div class="active-task" id="activeTask" hidden>
+          <span class="active-task-label">Aktif görev</span>
+          <span class="active-task-text" id="activeTaskText"></span>
+          <span class="active-task-count" id="activeTaskCount"></span>
+        </div>
+
+        <div class="controls">
+          <button class="btn btn-ghost" id="resetBtn" title="Sıfırla (R)" aria-label="Sıfırla">
+            <span class="ico i-reset" aria-hidden="true"></span>
+          </button>
+          <button class="btn btn-primary btn-main" id="startPauseBtn" title="Başlat / Duraklat (Boşluk)">Başlat</button>
+          <button class="btn btn-ghost" id="skipBtn" title="Atla" aria-label="Sonraki moda atla">
+            <span class="ico i-skip" aria-hidden="true"></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- GÖREVLER -->
+      <section class="view view-tasks" data-view-panel="tasks" hidden>
+        <header class="view-head">
+          <h1>Görevler</h1>
+          <p class="view-sub">Bugün üzerinde çalışacağın işler</p>
+        </header>
+
+        <form class="task-form" id="taskForm" autocomplete="off">
+          <input class="input task-title" id="taskInput" type="text" maxlength="100"
+                 placeholder="Yeni görev ekle…" aria-label="Görev adı">
+          <select class="input task-priority" id="taskPriority" aria-label="Öncelik">
+            <option value="high">Yüksek</option>
+            <option value="medium" selected>Orta</option>
+            <option value="low">Düşük</option>
+          </select>
+          <label class="task-target-wrap" title="Hedef pomodoro">
+            <span class="ico i-timer-sm" aria-hidden="true"></span>
+            <input class="input task-target" id="taskTarget" type="number" min="1" max="20" value="1"
+                   aria-label="Hedef pomodoro sayısı">
+          </label>
+          <button class="btn btn-primary" type="submit">Ekle</button>
+        </form>
+
+        <ul class="task-list" id="taskList"></ul>
+        <p class="empty" id="taskEmpty" hidden>Henüz görev yok. İlk görevini ekleyerek başla.</p>
+      </section>
+
+      <!-- İSTATİSTİK -->
+      <section class="view view-stats" data-view-panel="stats" hidden>
+        <header class="view-head">
+          <h1>İstatistikler</h1>
+          <p class="view-sub">Odaklanma yolculuğun</p>
+        </header>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">Bugün odaklanma</span>
+            <span class="stat-value"><strong id="statTodayMin">0</strong> dk</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Bugün pomodoro</span>
+            <span class="stat-value"><strong id="statTodayPomo">0</strong></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Toplam pomodoro</span>
+            <span class="stat-value"><strong id="statTotalPomo">0</strong></span>
+          </div>
+          <div class="stat-card goal-card">
+            <span class="stat-label">Günlük hedef</span>
+            <div class="goal-ring">
+              <svg viewBox="0 0 80 80" aria-hidden="true">
+                <circle class="goal-track" cx="40" cy="40" r="34" />
+                <circle class="goal-bar" id="goalBar" cx="40" cy="40" r="34" />
+              </svg>
+              <span class="goal-text" id="goalText">0/8</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Son 7 gün</h2>
+            <span class="panel-note" id="weekTotal"></span>
+          </div>
+          <div class="bar-chart" id="weekChart" role="img" aria-label="Son 7 günün odaklanma grafiği"></div>
+        </div>
+
+        <div class="panel two-col">
+          <div>
+            <div class="panel-head"><h2>Bu ay</h2></div>
+            <div class="mini-stats">
+              <div><span class="mini-label">Toplam süre</span><span class="mini-value" id="monthMin">0 dk</span></div>
+              <div><span class="mini-label">Pomodoro</span><span class="mini-value" id="monthPomo">0</span></div>
+              <div><span class="mini-label">Aktif gün</span><span class="mini-value" id="monthDays">0</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="panel-head"><h2>En verimli</h2></div>
+            <div class="mini-stats">
+              <div><span class="mini-label">Gün</span><span class="mini-value" id="bestDay">—</span></div>
+              <div><span class="mini-label">Saat</span><span class="mini-value" id="bestHour">—</span></div>
+              <div><span class="mini-label">Seri</span><span class="mini-value" id="bestStreak">0 gün</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Geçmiş</h2>
+            <button class="link-btn" id="clearHistoryBtn" type="button">Temizle</button>
+          </div>
+          <ul class="history-list" id="historyList"></ul>
+          <p class="empty" id="historyEmpty" hidden>Henüz tamamlanmış oturum yok.</p>
+        </div>
+      </section>
+
+      <!-- AYARLAR -->
+      <section class="view view-settings" data-view-panel="settings" hidden>
+        <header class="view-head">
+          <h1>Ayarlar</h1>
+          <p class="view-sub">Deneyimini kişiselleştir</p>
+        </header>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Süreler (dakika)</h2></div>
+          <div class="field-row">
+            <label for="setFocus">Odaklanma</label>
+            <input class="input num" id="setFocus" type="number" min="1" max="120" inputmode="numeric">
+          </div>
+          <div class="field-row">
+            <label for="setShort">Kısa mola</label>
+            <input class="input num" id="setShort" type="number" min="1" max="60" inputmode="numeric">
+          </div>
+          <div class="field-row">
+            <label for="setLong">Uzun mola</label>
+            <input class="input num" id="setLong" type="number" min="1" max="60" inputmode="numeric">
+          </div>
+          <div class="field-row">
+            <label for="setInterval">Uzun moladan önce pomodoro</label>
+            <input class="input num" id="setInterval" type="number" min="2" max="8" inputmode="numeric">
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Hedef & Otomasyon</h2></div>
+          <div class="field-row">
+            <label for="setGoal">Günlük hedef (pomodoro)</label>
+            <input class="input num" id="setGoal" type="number" min="1" max="30" inputmode="numeric">
+          </div>
+          <div class="field-row toggle">
+            <label for="setAutoBreak">Molaları otomatik başlat</label>
+            <input id="setAutoBreak" type="checkbox" class="switch">
+          </div>
+          <div class="field-row toggle">
+            <label for="setAutoPomo">Odaklanmayı otomatik başlat</label>
+            <input id="setAutoPomo" type="checkbox" class="switch">
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Ses & Bildirim</h2></div>
+          <div class="field-row toggle">
+            <label for="setSound">Bitiş sesi</label>
+            <input id="setSound" type="checkbox" class="switch">
+          </div>
+          <div class="field-row">
+            <label for="setVolume">Ses seviyesi</label>
+            <input id="setVolume" type="range" min="0" max="1" step="0.05" class="range">
+          </div>
+          <div class="field-row toggle">
+            <label for="setNotif">Masaüstü bildirimi</label>
+            <input id="setNotif" type="checkbox" class="switch">
+          </div>
+          <div class="field-row">
+            <label for="setAmbient">Ambiyans sesi</label>
+            <select class="input" id="setAmbient">
+              <option value="none">Kapalı</option>
+              <option value="rain">Yağmur</option>
+              <option value="waves">Dalga</option>
+              <option value="white">Beyaz gürültü</option>
+              <option value="brown">Kahverengi gürültü</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="setAmbientVol">Ambiyans seviyesi</label>
+            <input id="setAmbientVol" type="range" min="0" max="1" step="0.05" class="range">
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Görünüm</h2></div>
+          <div class="field-row toggle">
+            <label for="setTheme">Koyu tema</label>
+            <input id="setTheme" type="checkbox" class="switch">
+          </div>
+          <div class="field-row toggle">
+            <label for="setFocusMode">Odak modu (sade ekran)</label>
+            <input id="setFocusMode" type="checkbox" class="switch">
+          </div>
+        </div>
+
+        <div class="panel shortcuts">
+          <div class="panel-head"><h2>Klavye kısayolları</h2></div>
+          <ul>
+            <li><kbd>Boşluk</kbd> Başlat / Duraklat</li>
+            <li><kbd>R</kbd> Sıfırla</li>
+            <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Mod seç</li>
+            <li><kbd>F</kbd> Odak modu</li>
+            <li><kbd>T</kbd> Tema değiştir</li>
+          </ul>
+        </div>
+
+        <button class="btn btn-danger-ghost" id="resetAllBtn" type="button">Tüm verileri sıfırla</button>
+      </section>
+    </main>
+
+    <!-- Alt gezinme (mobil) -->
+    <nav class="tabbar" aria-label="Mobil gezinme">
+      <button class="tab active" data-nav="timer"><span class="nav-ico i-timer"></span><span>Zamanlayıcı</span></button>
+      <button class="tab" data-nav="tasks"><span class="nav-ico i-tasks"></span><span>Görevler</span></button>
+      <button class="tab" data-nav="stats"><span class="nav-ico i-stats"></span><span>İstatistik</span></button>
+      <button class="tab" data-nav="settings"><span class="nav-ico i-settings"></span><span>Ayarlar</span></button>
     </nav>
-
-    <div class="timer-wrap">
-      <svg class="progress" viewBox="0 0 240 240" aria-hidden="true">
-        <circle class="progress-track" cx="120" cy="120" r="110" />
-        <circle class="progress-bar" id="progressBar" cx="120" cy="120" r="110" />
-      </svg>
-      <div class="timer-inner">
-        <div class="timer" id="timer" aria-live="polite">25:00</div>
-        <p class="status" id="status">Odaklanma zamanı</p>
-      </div>
-    </div>
-
-    <div class="rounds" id="rounds" aria-label="Tur ilerlemesi"></div>
-
-    <div class="controls">
-      <button class="btn btn-primary" id="startPauseBtn">Başlat</button>
-      <button class="btn btn-secondary" id="resetBtn">Sıfırla</button>
-    </div>
-
-    <section class="task" aria-label="Görevler">
-      <form id="taskForm" class="task-form">
-        <input
-          id="taskInput"
-          class="task-input"
-          type="text"
-          maxlength="80"
-          placeholder="Şu an ne üzerinde çalışıyorsun?"
-          autocomplete="off"
-        >
-        <button class="task-add" type="submit" aria-label="Görev ekle">+</button>
-      </form>
-      <ul class="task-list" id="taskList"></ul>
-    </section>
-
-    <footer class="summary" id="summary">
-      Bugün: <strong id="summaryCount">0</strong> pomodoro ·
-      <strong id="summaryMinutes">0</strong> dakika
-    </footer>
-  </main>
-
-  <div class="modal-overlay" id="settingsModal" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-      <div class="modal-head">
-        <h2 id="settingsTitle">Ayarlar</h2>
-        <button class="icon-btn" id="closeSettingsBtn" aria-label="Kapat">
-          <span class="icon-close"></span>
-        </button>
-      </div>
-
-      <div class="setting-row">
-        <label for="focusMin">Odaklanma (dk)</label>
-        <input id="focusMin" type="number" min="1" max="120" inputmode="numeric">
-      </div>
-      <div class="setting-row">
-        <label for="shortMin">Kısa mola (dk)</label>
-        <input id="shortMin" type="number" min="1" max="60" inputmode="numeric">
-      </div>
-      <div class="setting-row">
-        <label for="longMin">Uzun mola (dk)</label>
-        <input id="longMin" type="number" min="1" max="60" inputmode="numeric">
-      </div>
-
-      <div class="setting-row toggle">
-        <label for="soundToggle">Sesli bildirim</label>
-        <input id="soundToggle" type="checkbox">
-      </div>
-      <div class="setting-row toggle">
-        <label for="autoStartToggle">Sonraki süreyi otomatik başlat</label>
-        <input id="autoStartToggle" type="checkbox">
-      </div>
-
-      <button class="btn btn-primary modal-save" id="saveSettingsBtn">Kaydet</button>
-    </div>
   </div>
 
-  <script src="script.js"></script>
+  <!-- Bitiş bildirimi (uygulama içi) -->
+  <div class="toast" id="toast" hidden role="status" aria-live="polite">
+    <span class="toast-icon" aria-hidden="true"></span>
+    <span class="toast-text" id="toastText"></span>
+  </div>
+
+  <!-- Odak modundan çıkış -->
+  <button class="focus-exit" id="focusExit" hidden aria-label="Odak modundan çık">Odak modundan çık</button>
+
+  <script src="store.js"></script>
+  <script src="audio.js"></script>
+  <script src="timer.js"></script>
+  <script src="tasks.js"></script>
+  <script src="stats.js"></script>
+  <script src="settings.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
