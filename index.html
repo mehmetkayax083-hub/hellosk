@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pomodoro Zamanlayıcı</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-mode="focus">
+  <main class="card">
+    <h1 class="title">Pomodoro</h1>
+
+    <nav class="modes" role="tablist" aria-label="Mod seçimi">
+      <button class="mode-btn active" role="tab" aria-selected="true" data-mode="focus">Odaklanma</button>
+      <button class="mode-btn" role="tab" aria-selected="false" data-mode="short">Kısa Mola</button>
+      <button class="mode-btn" role="tab" aria-selected="false" data-mode="long">Uzun Mola</button>
+    </nav>
+
+    <div class="timer" id="timer" aria-live="polite">25:00</div>
+    <p class="status" id="status">Odaklanma zamanı</p>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="startPauseBtn">Başlat</button>
+      <button class="btn btn-secondary" id="resetBtn">Sıfırla</button>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
