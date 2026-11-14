@@ -8,7 +8,17 @@
 </head>
 <body data-mode="focus">
   <main class="card">
-    <h1 class="title">Pomodoro</h1>
+    <header class="header">
+      <h1 class="title">Pomodoro</h1>
+      <div class="header-actions">
+        <button class="icon-btn" id="themeBtn" aria-label="Temayı değiştir" title="Tema (koyu/açık)">
+          <span class="icon-theme"></span>
+        </button>
+        <button class="icon-btn" id="settingsBtn" aria-label="Ayarlar" title="Ayarlar">
+          <span class="icon-gear"></span>
+        </button>
+      </div>
+    </header>
 
     <nav class="modes" role="tablist" aria-label="Mod seçimi">
       <button class="mode-btn active" role="tab" aria-selected="true" data-mode="focus">Odaklanma</button>
@@ -16,14 +26,79 @@
       <button class="mode-btn" role="tab" aria-selected="false" data-mode="long">Uzun Mola</button>
     </nav>
 
-    <div class="timer" id="timer" aria-live="polite">25:00</div>
-    <p class="status" id="status">Odaklanma zamanı</p>
+    <div class="timer-wrap">
+      <svg class="progress" viewBox="0 0 240 240" aria-hidden="true">
+        <circle class="progress-track" cx="120" cy="120" r="110" />
+        <circle class="progress-bar" id="progressBar" cx="120" cy="120" r="110" />
+      </svg>
+      <div class="timer-inner">
+        <div class="timer" id="timer" aria-live="polite">25:00</div>
+        <p class="status" id="status">Odaklanma zamanı</p>
+      </div>
+    </div>
+
+    <div class="rounds" id="rounds" aria-label="Tur ilerlemesi"></div>
 
     <div class="controls">
       <button class="btn btn-primary" id="startPauseBtn">Başlat</button>
       <button class="btn btn-secondary" id="resetBtn">Sıfırla</button>
     </div>
+
+    <section class="task" aria-label="Görevler">
+      <form id="taskForm" class="task-form">
+        <input
+          id="taskInput"
+          class="task-input"
+          type="text"
+          maxlength="80"
+          placeholder="Şu an ne üzerinde çalışıyorsun?"
+          autocomplete="off"
+        >
+        <button class="task-add" type="submit" aria-label="Görev ekle">+</button>
+      </form>
+      <ul class="task-list" id="taskList"></ul>
+    </section>
+
+    <footer class="summary" id="summary">
+      Bugün: <strong id="summaryCount">0</strong> pomodoro ·
+      <strong id="summaryMinutes">0</strong> dakika
+    </footer>
   </main>
+
+  <div class="modal-overlay" id="settingsModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="modal-head">
+        <h2 id="settingsTitle">Ayarlar</h2>
+        <button class="icon-btn" id="closeSettingsBtn" aria-label="Kapat">
+          <span class="icon-close"></span>
+        </button>
+      </div>
+
+      <div class="setting-row">
+        <label for="focusMin">Odaklanma (dk)</label>
+        <input id="focusMin" type="number" min="1" max="120" inputmode="numeric">
+      </div>
+      <div class="setting-row">
+        <label for="shortMin">Kısa mola (dk)</label>
+        <input id="shortMin" type="number" min="1" max="60" inputmode="numeric">
+      </div>
+      <div class="setting-row">
+        <label for="longMin">Uzun mola (dk)</label>
+        <input id="longMin" type="number" min="1" max="60" inputmode="numeric">
+      </div>
+
+      <div class="setting-row toggle">
+        <label for="soundToggle">Sesli bildirim</label>
+        <input id="soundToggle" type="checkbox">
+      </div>
+      <div class="setting-row toggle">
+        <label for="autoStartToggle">Sonraki süreyi otomatik başlat</label>
+        <input id="autoStartToggle" type="checkbox">
+      </div>
+
+      <button class="btn btn-primary modal-save" id="saveSettingsBtn">Kaydet</button>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>
