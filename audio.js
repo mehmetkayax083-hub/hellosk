@@ -10,6 +10,7 @@
     { id: "fire", label: "Şömine" },
     { id: "white", label: "Beyaz gürültü" },
     { id: "brown", label: "Kahverengi gürültü" },
+    { id: "pad", label: "Lo-fi pad" },
   ];
   let ctx = null;
   let ambientNodes = null;
@@ -80,6 +81,34 @@
     stopAmbient();
     currentAmbient = kind;
     if (!kind || kind === "none") return;
+    if (kind === "pad") {
+      const ac = ensureCtx();
+      if (!ac) return;
+      const gain = ac.createGain();
+      gain.gain.value = (typeof volume === "number" ? volume : 0.4) * 0.07;
+      const oscs = [196, 247, 294].map((freq, index) => {
+        const osc = ac.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = freq;
+        osc.detune.value = index === 1 ? 7 : -5;
+        osc.connect(gain);
+        osc.start();
+        return osc;
+      });
+      const bed = ac.createBufferSource();
+      bed.buffer = noiseBuffer(ac, "brown");
+      bed.loop = true;
+      const filter = ac.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 500;
+      const bedGain = ac.createGain();
+      bedGain.gain.value = gain.gain.value * 0.35;
+      bed.connect(filter).connect(bedGain).connect(ac.destination);
+      gain.connect(ac.destination);
+      bed.start();
+      ambientNodes = { src: bed, gain, lfo: null, lfoGain: null, crackle: null, extra: oscs };
+      return;
+    }
     const ac = ensureCtx();
     if (!ac) return;
 
@@ -162,6 +191,7 @@
         ambientNodes.src.stop();
         if (ambientNodes.lfo) ambientNodes.lfo.stop();
         if (ambientNodes.crackle) clearInterval(ambientNodes.crackle);
+        if (ambientNodes.extra) ambientNodes.extra.forEach((osc) => osc.stop());
       } catch {
         /* zaten durmuş olabilir */
       }

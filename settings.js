@@ -27,6 +27,10 @@
       theme: document.getElementById("setTheme"),
       focusMode: document.getElementById("setFocusMode"),
       name: document.getElementById("setName"),
+      studyStart: document.getElementById("setStudyStart"),
+      studyEnd: document.getElementById("setStudyEnd"),
+      largeText: document.getElementById("setLargeText"),
+      exportCsv: document.getElementById("exportCsvBtn"),
       swatches: document.querySelectorAll(".swatch"),
       exportBtn: document.getElementById("exportBtn"),
       importFile: document.getElementById("importFile"),
@@ -64,6 +68,9 @@
     dom.theme.checked = s.theme === "dark";
     dom.focusMode.checked = s.focusMode;
     dom.name.value = s.displayName || "";
+    dom.studyStart.value = s.studyStart || "09:00";
+    dom.studyEnd.value = s.studyEnd || "18:00";
+    dom.largeText.checked = Boolean(s.largeText);
     dom.swatches.forEach((btn) => {
       const on = btn.dataset.palette === s.palette;
       btn.classList.toggle("active", on);
@@ -180,6 +187,22 @@
       });
     });
     dom.exportBtn.addEventListener("click", downloadBackup);
+    dom.exportCsv.addEventListener("click", downloadCsv);
+    dom.studyStart.addEventListener("change", () => {
+      if (!/^\d{2}:\d{2}$/.test(dom.studyStart.value)) return;
+      s().studyStart = dom.studyStart.value;
+      FF.store.commit();
+    });
+    dom.studyEnd.addEventListener("change", () => {
+      if (!/^\d{2}:\d{2}$/.test(dom.studyEnd.value)) return;
+      s().studyEnd = dom.studyEnd.value;
+      FF.store.commit();
+    });
+    dom.largeText.addEventListener("change", () => {
+      s().largeText = dom.largeText.checked;
+      FF.app.applyTheme();
+      FF.store.save();
+    });
     dom.importFile.addEventListener("change", importBackup);
     dom.name.addEventListener("change", () => {
       s().displayName = dom.name.value.trim().slice(0, 40);
@@ -208,6 +231,15 @@
     const timer = FF.store.state.timer;
     if (!timer.running) timer.remaining = FF.store.modeSeconds(timer.mode);
     FF.store.commit();
+  }
+
+  function downloadCsv() {
+    const blob = new Blob([FF.store.exportCsv()], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `focus-flow-${FF.store.todayKey()}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1500);
   }
 
   function downloadBackup() {

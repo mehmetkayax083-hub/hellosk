@@ -1,5 +1,5 @@
 /* Focus Flow — çevrimdışı kabuk. Ağ varsa taze dosyayı kullanır, yoksa önbelleğe döner. */
-const CACHE = "focus-flow-v7";
+const CACHE = "focus-flow-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -14,6 +14,9 @@ const ASSETS = [
   "./calendar.js",
   "./achievements.js",
   "./sounds.js",
+  "./courses.js",
+  "./notes.js",
+  "./cards.js",
   "./app.js",
   "./manifest.webmanifest",
   "./icon-192.png",

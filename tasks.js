@@ -25,6 +25,8 @@
       due: document.getElementById("taskDue"),
       category: document.getElementById("taskCategory"),
       newCategory: document.getElementById("newCategory"),
+      course: document.getElementById("taskCourse"),
+      weekday: document.getElementById("taskWeekday"),
       filterStatus: document.getElementById("filterStatus"),
       filterPriority: document.getElementById("filterPriority"),
       filterCategory: document.getElementById("filterCategory"),
@@ -68,9 +70,11 @@
       repeatDay: dom.repeat.checked ? FF.store.todayKey() : null,
       description: dom.desc.value.trim().slice(0, 280),
       categoryId: categoryFromForm(),
+      courseId: dom.course.value || null,
       dueDate: validDate(dom.due.value),
       completedOn: null,
     };
+    FF.store.placeWeekday(task.id, dom.weekday.value);
     dom.desc.value = "";
     dom.due.value = "";
     dom.newCategory.value = "";
@@ -106,7 +110,19 @@
     if ([...select.options].some((option) => option.value === current)) select.value = current;
   }
 
-  function update(id, text, priority, target, repeat, desc, due, categoryId) {
+  function fillCourseSelect(select, selected) {
+    const current = selected === undefined ? select.value : selected;
+    select.innerHTML = `<option value="">Ders yok</option>`;
+    FF.store.state.courses.forEach((course) => {
+      const option = document.createElement("option");
+      option.value = course.id;
+      option.textContent = course.name;
+      select.appendChild(option);
+    });
+    if ([...select.options].some((option) => option.value === current)) select.value = current;
+  }
+
+  function update(id, text, priority, target, repeat, desc, due, categoryId, courseId, weekday) {
     const task = FF.store.state.tasks.find((item) => item.id === id);
     const trimmed = text.trim();
     if (!task || !trimmed) return;
@@ -122,7 +138,9 @@
     }
     task.description = desc.trim().slice(0, 280);
     task.categoryId = categoryId || null;
+    task.courseId = courseId || null;
     task.dueDate = validDate(due);
+    FF.store.placeWeekday(id, weekday);
     editingId = null;
     FF.store.commit();
   }
@@ -243,6 +261,7 @@
     const openTasks = sorted();
     fillCategories(dom.category);
     fillCategories(dom.filterCategory, filterCategory);
+    fillCourseSelect(dom.course);
     const today = FF.store.todayKey();
     const weekStart = FF.store.weekStart(today);
     const weekEnd = FF.store.shiftDay(weekStart, 6);
@@ -329,6 +348,13 @@
         cat.className = "task-cat";
         cat.textContent = category.name;
         meta.appendChild(cat);
+      }
+      const course = FF.store.state.courses.find((item) => item.id === task.courseId);
+      if (course) {
+        const label = document.createElement("span");
+        label.className = "task-cat";
+        label.textContent = course.name;
+        meta.appendChild(label);
       }
       if (task.dueDate) {
         const due = document.createElement("span");
@@ -494,6 +520,23 @@
     category.setAttribute("aria-label", "Kategori");
     fillCategories(category, task.categoryId || "", "Kategori yok");
 
+    const course = document.createElement("select");
+    course.className = "input";
+    course.setAttribute("aria-label", "Ders");
+    fillCourseSelect(course, task.courseId || "");
+
+    const weekday = document.createElement("select");
+    weekday.className = "input";
+    weekday.setAttribute("aria-label", "Haftanın günü");
+    ["", "0", "1", "2", "3", "4", "5", "6"].forEach((value, index) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = index === 0 ? "Haftalık plana alma" : ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"][index - 1];
+      weekday.appendChild(option);
+    });
+    const placed = (FF.store.state.weekPlan.days || []).findIndex((list) => list.includes(task.id));
+    if (placed >= 0) weekday.value = String(placed);
+
     const repeatLabel = document.createElement("label");
     repeatLabel.className = "repeat-opt";
     const repeat = document.createElement("input");
@@ -519,10 +562,21 @@
     });
     actions.append(save, cancel, repeatLabel);
 
-    form.append(name, desc, priority, target, due, category, actions);
+    form.append(name, desc, priority, target, due, category, course, weekday, actions);
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      update(task.id, name.value, priority.value, target.value, repeat.checked, desc.value, due.value, category.value);
+      update(
+        task.id,
+        name.value,
+        priority.value,
+        target.value,
+        repeat.checked,
+        desc.value,
+        due.value,
+        category.value,
+        course.value,
+        weekday.value
+      );
     });
     return form;
   }

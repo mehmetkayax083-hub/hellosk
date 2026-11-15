@@ -35,6 +35,18 @@
           <span class="nav-ico i-tasks" aria-hidden="true"></span>
           <span class="nav-label">Görevler</span>
         </button>
+        <button class="nav-item" data-nav="courses">
+          <span class="nav-ico i-tasks" aria-hidden="true"></span>
+          <span class="nav-label">Dersler</span>
+        </button>
+        <button class="nav-item" data-nav="notes">
+          <span class="nav-ico i-tasks" aria-hidden="true"></span>
+          <span class="nav-label">Notlar</span>
+        </button>
+        <button class="nav-item" data-nav="cards">
+          <span class="nav-ico i-tasks" aria-hidden="true"></span>
+          <span class="nav-label">Kartlar</span>
+        </button>
         <button class="nav-item" data-nav="calendar">
           <span class="nav-ico i-cal" aria-hidden="true"></span>
           <span class="nav-label">Takvim</span>
@@ -110,6 +122,21 @@
           <div class="panel-head"><h2>Bu hafta</h2><span class="panel-note" id="homeWeek"></span></div>
           <p class="panel-copy" id="homeNote"></p>
         </div>
+        <div class="panel" id="homeWeekPanel">
+          <div class="panel-head"><h2>Haftalık program</h2></div>
+          <ul class="home-list" id="homeWeekPlan"></ul>
+        </div>
+        <p class="panel-copy" id="homeCompare"></p>
+        <p class="panel-copy" id="homeHours"></p>
+        <div class="panel">
+          <div class="panel-head"><h2>Bu cihaz</h2></div>
+          <p class="panel-copy" id="homeRoom">Ortak oda bağlı değil. Burada yalnızca bu cihazdaki çalışma görünür.</p>
+        </div>
+        <div class="panel" id="homeNoticePanel">
+          <div class="panel-head"><h2>Bildirimler</h2></div>
+          <ul class="home-list" id="homeNotices"></ul>
+          <p class="empty" id="homeNoticesEmpty">Henüz bildirim yok.</p>
+        </div>
         <div class="panel">
           <div class="panel-head"><h2>Son çalışmalar</h2></div>
           <ul class="home-list" id="homeRecent"></ul>
@@ -135,7 +162,9 @@
           <button type="button" data-focus="45">45</button>
           <button type="button" data-focus="50">50</button>
           <button type="button" data-focus="60">60</button>
+          <button type="button" id="freeModeBtn">Serbest</button>
         </div>
+        <button class="btn btn-line" id="saveFreeBtn" type="button" hidden>Oturumu kaydet</button>
 
         <div class="dial">
           <svg class="dial-svg" viewBox="0 0 260 260" aria-hidden="true">
@@ -211,6 +240,17 @@
           <input class="input" id="taskDue" type="date" aria-label="Son teslim tarihi">
           <select class="input" id="taskCategory" aria-label="Kategori"></select>
           <input class="input" id="newCategory" maxlength="40" placeholder="Yeni kategori" aria-label="Yeni kategori">
+          <select class="input" id="taskCourse" aria-label="Ders"></select>
+          <select class="input" id="taskWeekday" aria-label="Haftanın günü">
+            <option value="">Haftalık plana alma</option>
+            <option value="0">Pazartesi</option>
+            <option value="1">Salı</option>
+            <option value="2">Çarşamba</option>
+            <option value="3">Perşembe</option>
+            <option value="4">Cuma</option>
+            <option value="5">Cumartesi</option>
+            <option value="6">Pazar</option>
+          </select>
         </form>
         <div class="task-filters">
           <select class="input" id="filterStatus" aria-label="Durum">
@@ -300,6 +340,19 @@
           <div class="panel-head"><h2>Kategorilere göre</h2></div>
           <ul class="task-breakdown" id="catBreakdown"></ul>
           <p class="empty" id="catBreakdownEmpty" hidden>Kategorili oturum yok.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Bu ayın hedefi</h2><span class="panel-note" id="monthGoalRate">0%</span></div>
+          <p class="panel-copy" id="monthReport"></p>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Yarım kalan görevler</h2></div>
+          <ul class="home-list" id="abandonedList"></ul>
+          <p class="empty" id="abandonedEmpty">Başlanıp bitirilmemiş görev yok.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Rekorlar</h2></div>
+          <ul class="home-list" id="recordList"></ul>
         </div>
 
         <div class="panel">
@@ -412,6 +465,10 @@
           <p class="panel-copy" id="levelHint"></p>
         </div>
         <div class="badge-grid" id="badgeGrid"></div>
+        <div class="panel">
+          <div class="panel-head"><h2>Günün işi ve haftanın hedefi</h2></div>
+          <ul class="home-list" id="questList"></ul>
+        </div>
       </section>
 
       <!-- SESLER -->
@@ -427,6 +484,53 @@
           </div>
         </div>
         <div class="sound-grid" id="soundGrid"></div>
+      </section>
+
+      <section class="view" data-view-panel="courses" hidden>
+        <header class="view-head"><h1>Dersler</h1><p class="view-sub">Konular, sınav tarihi ve gerçek çalışma süresi</p></header>
+        <form class="task-form" id="courseForm">
+          <input class="input" id="courseName" maxlength="60" placeholder="Ders adı" aria-label="Ders adı" required>
+          <input class="input num" id="courseGoal" type="number" min="1" max="5000" value="60" aria-label="Hedef dakika">
+          <input class="input" id="courseExam" type="date" aria-label="Sınav tarihi">
+          <button class="btn btn-primary" type="submit">Ders ekle</button>
+        </form>
+        <div id="courseList"></div>
+        <p class="empty" id="courseEmpty">Henüz ders yok.</p>
+        <div class="panel"><div class="panel-head"><h2>Karşılaştırma</h2></div><ul class="home-list" id="courseCompare"></ul></div>
+      </section>
+
+      <section class="view" data-view-panel="notes" hidden>
+        <header class="view-head"><h1>Notlar</h1><p class="view-sub">Yazdıkların bu cihazda kendiliğinden kaydolur</p></header>
+        <form class="note-form" id="noteForm">
+          <input class="input" id="noteTitle" maxlength="80" placeholder="Başlık" aria-label="Not başlığı">
+          <textarea class="input edit-desc" id="noteBody" maxlength="4000" rows="5" placeholder="Not" aria-label="Not"></textarea>
+          <select class="input" id="noteCourse" aria-label="Ders"></select>
+          <button class="btn btn-line" type="submit">Formu temizle</button>
+        </form>
+        <input class="input task-search" id="noteSearch" type="search" placeholder="Not ara…" aria-label="Not ara">
+        <ul class="task-list" id="noteList"></ul>
+        <p class="empty" id="noteEmpty">Henüz not yok.</p>
+      </section>
+
+      <section class="view" data-view-panel="cards" hidden>
+        <header class="view-head"><h1>Kartlar</h1><p class="view-sub">Soru ve cevabı çevir, bildiğini sonraki güne ertele</p></header>
+        <p class="panel-copy" id="cardProgress"></p>
+        <form class="note-form" id="cardForm">
+          <input class="input" id="cardFront" maxlength="200" placeholder="Soru" aria-label="Soru" required>
+          <textarea class="input edit-desc" id="cardBack" maxlength="400" rows="3" placeholder="Cevap" aria-label="Cevap" required></textarea>
+          <select class="input" id="cardCourse" aria-label="Ders"></select>
+          <button class="btn btn-primary" type="submit">Kart ekle</button>
+        </form>
+        <div class="panel card-stage">
+          <p class="task-cat" id="cardDeck"></p>
+          <p class="card-face" id="cardFace" hidden></p>
+          <p class="empty" id="cardEmpty">Bugün tekrar edilecek kart yok.</p>
+          <div class="note-actions">
+            <button class="btn btn-line" id="cardShow" type="button" hidden>Cevabı göster</button>
+            <button class="btn btn-line" id="cardAgain" type="button" hidden>Tekrar et</button>
+            <button class="btn btn-primary" id="cardKnew" type="button" hidden>Bildim</button>
+          </div>
+        </div>
       </section>
 
       <!-- AYARLAR -->
@@ -522,6 +626,7 @@
               <option value="fire">Şömine</option>
               <option value="white">Beyaz gürültü</option>
               <option value="brown">Kahverengi gürültü</option>
+              <option value="pad">Lo-fi pad</option>
             </select>
           </div>
           <div class="field-row">
@@ -532,6 +637,18 @@
 
         <div class="panel">
           <div class="panel-head"><h2>Görünüm</h2></div>
+          <div class="field-row">
+            <label for="setStudyStart">Çalışma başlangıcı</label>
+            <input class="input" id="setStudyStart" type="time">
+          </div>
+          <div class="field-row">
+            <label for="setStudyEnd">Çalışma bitişi</label>
+            <input class="input" id="setStudyEnd" type="time">
+          </div>
+          <div class="field-row toggle">
+            <label for="setLargeText">Daha büyük yazı</label>
+            <input id="setLargeText" type="checkbox" class="switch">
+          </div>
           <div class="field-row">
             <label for="setName">Görünen ad</label>
             <input class="input" id="setName" maxlength="40" placeholder="İsteğe bağlı" autocomplete="nickname">
@@ -561,6 +678,7 @@
           <p class="panel-copy">Görevler, geçmiş ve ayarlar bu tarayıcıda durur. Bir kopyasını indirip sonra geri yükleyebilirsin.</p>
           <div class="backup-actions">
             <button class="btn btn-primary" id="exportBtn" type="button">Yedeği indir</button>
+            <button class="btn btn-line" id="exportCsvBtn" type="button">CSV indir</button>
             <label class="btn btn-line" for="importFile">Yedeği yükle</label>
             <input id="importFile" type="file" accept="application/json,.json" hidden>
           </div>
@@ -588,6 +706,9 @@
       <button class="tab active" data-nav="home"><span class="nav-ico i-home"></span><span>Ana</span></button>
       <button class="tab" data-nav="timer"><span class="nav-ico i-timer"></span><span>Sayaç</span></button>
       <button class="tab" data-nav="tasks"><span class="nav-ico i-tasks"></span><span>Görev</span></button>
+      <button class="tab" data-nav="courses"><span class="nav-ico i-tasks"></span><span>Ders</span></button>
+      <button class="tab" data-nav="notes"><span class="nav-ico i-tasks"></span><span>Not</span></button>
+      <button class="tab" data-nav="cards"><span class="nav-ico i-tasks"></span><span>Kart</span></button>
       <button class="tab" data-nav="calendar"><span class="nav-ico i-cal"></span><span>Takvim</span></button>
       <button class="tab" data-nav="stats"><span class="nav-ico i-stats"></span><span>Veri</span></button>
       <button class="tab" data-nav="achievements"><span class="nav-ico i-badge"></span><span>Rozet</span></button>
@@ -606,6 +727,14 @@
   <button class="focus-exit" id="focusExit" hidden aria-label="Odak modundan çık">Odak modundan çık</button>
 
   <form class="note-sheet" id="noteSheet" hidden>
+    <p class="panel-copy" id="noteSummary"></p>
+    <div class="rate-row" id="noteRate" role="group" aria-label="Odak değerlendirmesi">
+      <button type="button" data-rate="1">1</button>
+      <button type="button" data-rate="2">2</button>
+      <button type="button" data-rate="3">3</button>
+      <button type="button" data-rate="4">4</button>
+      <button type="button" data-rate="5">5</button>
+    </div>
     <label for="noteInput">Bu oturumda ne yaptın?</label>
     <input class="input" id="noteInput" type="text" maxlength="140" placeholder="Kısa bir not…" autocomplete="off">
     <div class="note-actions">
@@ -633,6 +762,9 @@
   <script src="calendar.js"></script>
   <script src="achievements.js"></script>
   <script src="sounds.js"></script>
+  <script src="courses.js"></script>
+  <script src="notes.js"></script>
+  <script src="cards.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

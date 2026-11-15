@@ -63,6 +63,8 @@
       planLine: document.getElementById("planLine"),
       etaLine: document.getElementById("etaLine"),
       goalLine: document.getElementById("goalLine"),
+      saveFree: document.getElementById("saveFreeBtn"),
+      freeBtn: document.getElementById("freeModeBtn"),
       breath: document.getElementById("breath"),
       breathBox: document.getElementById("breathBox"),
       breathLabel: document.getElementById("breathLabel"),
@@ -81,16 +83,19 @@
 
   function render() {
     const timer = t();
-    const total = FF.store.modeSeconds(timer.mode);
-    const time = fmt(timer.remaining);
+    const free = timer.mode === "free";
+    const total = free ? 3600 : FF.store.modeSeconds(timer.mode);
+    const time = fmt(free ? timer.elapsed || 0 : timer.remaining);
 
     dom.time.textContent = time;
-    dom.phase.textContent = PHASE[timer.mode];
-    dom.startPause.textContent = running() ? "Duraklat" : timer.remaining < total ? "Devam Et" : "Başlat";
+    dom.phase.textContent = free ? "Serbest" : PHASE[timer.mode];
+    dom.startPause.textContent = running() ? "Duraklat" : !free && timer.remaining < total ? "Devam Et" : "Başlat";
+    if (dom.saveFree) dom.saveFree.hidden = !free;
+    if (dom.freeBtn) dom.freeBtn.classList.toggle("active", free);
     dom.body.dataset.mode = timer.mode;
-    document.title = `${time} · ${PHASE[timer.mode]} — Focus Flow`;
+    document.title = `${time} · ${free ? "Serbest" : PHASE[timer.mode]} — Focus Flow`;
 
-    const ratio = total > 0 ? timer.remaining / total : 0;
+    const ratio = free ? Math.min((timer.elapsed || 0) / 3600, 1) : total > 0 ? timer.remaining / total : 0;
     dom.bar.style.strokeDasharray = String(CIRC);
     dom.bar.style.strokeDashoffset = String(CIRC * (1 - ratio));
 
@@ -129,7 +134,7 @@
 
   function renderGoal() {
     const today = FF.store.todayKey();
-    const count = FF.store.state.history.filter((item) => item.date === today).length;
+    const count = FF.store.state.history.filter((item) => item.date === today && item.mode !== "free").length;
     const goal = FF.store.state.settings.dailyGoal;
     dom.goalLine.textContent = `Bugün ${count}/${goal}`;
     dom.goalLine.classList.toggle("met", count >= goal);
@@ -319,6 +324,62 @@
     if (timer.remaining <= 0) complete();
   }
 
+  function tickFree() {
+    const timer = t();
+    if (timer.owner !== tabId) return;
+    timer.elapsed = Math.max(0, Math.round((Date.now() - timer.freeOrigin) / 1000));
+    timer.beat = Date.now();
+    paint();
+  }
+
+  function beginFree() {
+    const timer = t();
+    if (timer.running) pause();
+    timer.mode = "free";
+    timer.elapsed = 0;
+    timer.freeOrigin = null;
+    timer.remaining = 0;
+    timer.pauses = 0;
+    timer.sessionId = null;
+    render();
+    FF.store.save();
+  }
+
+  function saveFree() {
+    const timer = t();
+    if (timer.mode !== "free") return;
+    if (timer.running && timer.freeOrigin) timer.elapsed = Math.max(0, Math.round((Date.now() - timer.freeOrigin) / 1000));
+    timer.running = false;
+    timer.endTime = null;
+    clearInterval(intervalId);
+    intervalId = null;
+    releaseWake();
+    const minutes = Math.round((timer.elapsed || 0) / 60);
+    if (minutes < 1) {
+      if (FF.app) FF.app.toast("Kaydetmek için en az 1 dakika.");
+      return;
+    }
+    const s = FF.store.state;
+    s.history.push({
+      ts: Date.now(),
+      date: FF.store.todayKey(),
+      mode: "free",
+      minutes,
+      taskId: s.activeTaskId,
+      note: "",
+      sessionId: "free" + Date.now(),
+      pauses: timer.pauses || 0,
+      rating: null,
+      free: true,
+    });
+    if (FF.store.clearRestToday) FF.store.clearRestToday();
+    timer.elapsed = 0;
+    timer.pauses = 0;
+    timer.freeOrigin = null;
+    FF.store.commit();
+    if (FF.app) FF.app.toast(`${minutes} dakikalık serbest çalışma kaydedildi.`);
+  }
+
   function followClock() {
     const timer = t();
     if (!timer.running || !timer.endTime) return;
@@ -342,6 +403,11 @@
       }
       return;
     }
+    if (timer.mode === "free" && timer.running && timer.freeOrigin) {
+      if (!timer.owner || timer.owner === tabId || ownerIsStale()) timer.owner = tabId;
+      intervalId = setInterval(tickFree, 250);
+      return;
+    }
     if (timer.running && timer.endTime && timer.endTime > Date.now()) {
       if (!timer.owner || timer.owner === tabId || ownerIsStale()) timer.owner = tabId;
       intervalId = setInterval(timer.owner === tabId ? tick : followClock, 250);
@@ -352,9 +418,11 @@
   /* Sadece sayaç yüzeyini günceller (her saniye tam render maliyetli olmasın). */
   function paint() {
     const timer = t();
-    const total = FF.store.modeSeconds(timer.mode);
-    const ratio = total > 0 ? timer.remaining / total : 0;
-    const time = fmt(timer.remaining);
+    const free = timer.mode === "free";
+    const total = free ? 3600 : FF.store.modeSeconds(timer.mode);
+    const shown = free ? timer.elapsed || 0 : timer.remaining;
+    const ratio = free ? Math.min(shown / 3600, 1) : total > 0 ? shown / total : 0;
+    const time = fmt(shown);
     dom.time.textContent = time;
     dom.bar.style.strokeDashoffset = String(CIRC * (1 - ratio));
     document.title = `${time} · ${PHASE[timer.mode]} — Focus Flow`;
@@ -391,10 +459,25 @@
       if (FF.app) FF.app.toast("Sayaç başka bir sekmede çalışıyor.");
       return;
     }
-    if (timer.running || timer.remaining <= 0) return;
+    if (timer.running) return;
+    if (timer.mode !== "free" && timer.remaining <= 0) return;
     FF.audio.unlock();
     if (FF.app) FF.app.requestNotifications();
     timer.owner = tabId;
+    if (timer.mode === "free") {
+      timer.running = true;
+      timer.freeOrigin = Date.now() - (timer.elapsed || 0) * 1000;
+      timer.endTime = null;
+      timer.beat = Date.now();
+      clearInterval(intervalId);
+      intervalId = setInterval(tickFree, 250);
+      acquireWake();
+      render();
+      FF.store.save();
+      publish();
+      return;
+    }
+    if (timer.mode === "focus" && timer.remaining >= FF.store.modeSeconds("focus")) timer.pauses = 0;
     timer.sessionId = "s" + Date.now();
     timer.running = true;
     timer.beat = Date.now();
@@ -412,6 +495,7 @@
     if (timer.running && timer.endTime) {
       timer.remaining = Math.max(0, Math.round((timer.endTime - Date.now()) / 1000));
     }
+    if (timer.running && (timer.mode === "focus" || timer.mode === "free")) timer.pauses = (timer.pauses || 0) + 1;
     timer.owner = tabId;
     timer.running = false;
     timer.endTime = null;
@@ -434,7 +518,13 @@
     clearInterval(intervalId);
     intervalId = null;
     releaseWake();
-    timer.remaining = FF.store.modeSeconds(timer.mode);
+    if (timer.mode === "free") {
+      timer.elapsed = 0;
+      timer.freeOrigin = null;
+      timer.remaining = 0;
+    } else {
+      timer.remaining = FF.store.modeSeconds(timer.mode);
+    }
     timer.sessionId = null;
     render();
     FF.store.save();
@@ -449,6 +539,8 @@
     intervalId = null;
     timer.mode = mode;
     timer.tip = pickTip(mode);
+    timer.elapsed = 0;
+    timer.freeOrigin = null;
     timer.remaining = FF.store.modeSeconds(mode);
     releaseWake();
     timer.sessionId = null;
@@ -557,7 +649,11 @@
       taskId: s.activeTaskId,
       note: "",
       sessionId: s.timer.sessionId || null,
+      pauses: s.timer.pauses || 0,
+      rating: null,
+      free: false,
     });
+    s.timer.pauses = 0;
     if (FF.store.clearRestToday) FF.store.clearRestToday();
     if (s.history.length > FF.store.HISTORY_CAP) s.history = s.history.slice(-FF.store.HISTORY_CAP);
   }
@@ -591,6 +687,8 @@
     document.querySelectorAll("[data-focus]").forEach((btn) => {
       btn.addEventListener("click", () => setFocusLength(Number(btn.dataset.focus)));
     });
+    if (dom.freeBtn) dom.freeBtn.addEventListener("click", beginFree);
+    if (dom.saveFree) dom.saveFree.addEventListener("click", saveFree);
     if (channel) {
       channel.onmessage = (event) => {
         if (!event.data || event.data.from === tabId) return;

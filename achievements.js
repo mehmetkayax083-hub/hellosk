@@ -33,12 +33,12 @@
     const history = FF.store.state.history;
     const byDay = {};
     history.forEach((item) => {
-      byDay[item.date] = (byDay[item.date] || 0) + 1;
+      if (item.mode !== "free") byDay[item.date] = (byDay[item.date] || 0) + 1;
     });
     const goal = FF.store.state.settings.dailyGoal || 8;
     const longest = FF.stats.longestStreak ? FF.stats.longestStreak() : FF.stats.currentStreak();
     return {
-      count: history.length,
+      count: history.filter((item) => item.mode !== "free").length,
       minutes: minutesOf(history),
       streak: Math.max(FF.stats.currentStreak(), longest),
       goalHit: Object.values(byDay).some((count) => count >= goal),
@@ -68,6 +68,19 @@
         `</article>`
       );
     }).join("");
+    const state = FF.store.state;
+    const today = FF.store.todayKey();
+    const week = FF.store.weekStart(today);
+    const focusToday = state.history.filter((item) => item.date === today && item.mode === "focus").length;
+    const weekFocus = state.history.filter((item) => item.date >= week && item.mode === "focus").length;
+    const quests = [
+      [focusToday >= 1, "Bugün bir pomodoro"],
+      [state.tasks.some((task) => task.completedOn === today), "Bugün bir görevi bitir"],
+      [weekFocus >= Math.min(4, state.settings.weeklyGoal), `Bu hafta ${weekFocus}/${state.settings.weeklyGoal} pomodoro`],
+    ];
+    document.getElementById("questList").innerHTML = quests
+      .map(([done, label]) => `<li>${done ? "Tamam" : "Açık"} · ${label}</li>`)
+      .join("");
   }
 
   function noteLevel() {

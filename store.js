@@ -21,12 +21,20 @@
       dailyGoal: 8,
       weeklyGoal: 30,
       displayName: "",
+      studyStart: "09:00",
+      studyEnd: "18:00",
+      largeText: false,
       focusMode: false,
       reminder: { enabled: false, time: "09:00" },
       chime: "bell",
     },
     tasks: [],
     categories: [],
+    courses: [],
+    notes: [],
+    cards: [],
+    notices: [],
+    weekPlan: { week: "", days: [[], [], [], [], [], [], []] },
     activeTaskId: null,
     plan: { date: "", order: [] },
     previousPlan: { date: "", order: [] },
@@ -35,7 +43,7 @@
     goalCelebratedOn: null,
     reminderSentOn: null,
     levelSeen: 0,
-    timer: { mode: "focus", remaining: 25 * 60, running: false, endTime: null, cycle: 0, tip: "", owner: null, sessionId: null, beat: 0 },
+    timer: { mode: "focus", remaining: 25 * 60, running: false, endTime: null, cycle: 0, tip: "", owner: null, sessionId: null, beat: 0, pauses: 0, elapsed: 0, freeOrigin: null },
     history: [],
   };
 
@@ -97,6 +105,10 @@
       state.settings = deepMerge(clone(DEFAULTS.settings), saved.settings || {});
       state.tasks = Array.isArray(saved.tasks) ? saved.tasks : [];
       state.categories = Array.isArray(saved.categories) ? saved.categories : [];
+      state.courses = Array.isArray(saved.courses) ? saved.courses : [];
+      state.notes = Array.isArray(saved.notes) ? saved.notes : [];
+      state.cards = Array.isArray(saved.cards) ? saved.cards : [];
+      state.notices = Array.isArray(saved.notices) ? saved.notices : [];
       state.history = Array.isArray(saved.history) ? saved.history : [];
       if (!state.plan || !Array.isArray(state.plan.order)) state.plan = { date: "", order: [] };
       if (!state.previousPlan || !Array.isArray(state.previousPlan.order)) {
@@ -107,12 +119,20 @@
     if (!CHIMES.includes(state.settings.chime)) state.settings.chime = "bell";
     state.settings.weeklyGoal = clamp(state.settings.weeklyGoal, 1, 80, 30);
     state.settings.displayName = String(state.settings.displayName || "").trim().slice(0, 40);
-    if (!["none", "rain", "waves", "wind", "fire", "white", "brown"].includes(state.settings.ambient)) {
+    if (!["none", "rain", "waves", "wind", "fire", "white", "brown", "pad"].includes(state.settings.ambient)) {
       state.settings.ambient = "none";
     }
+    state.settings.studyStart = /^\d{2}:\d{2}$/.test(state.settings.studyStart) ? state.settings.studyStart : "09:00";
+    state.settings.studyEnd = /^\d{2}:\d{2}$/.test(state.settings.studyEnd) ? state.settings.studyEnd : "18:00";
+    state.settings.largeText = Boolean(state.settings.largeText);
     state.categories = (state.categories || []).map(cleanCategory).filter(Boolean);
+    state.courses = (state.courses || []).map(cleanCourse).filter(Boolean);
+    state.notes = (state.notes || []).map(cleanNote).filter(Boolean);
+    state.cards = (state.cards || []).map(cleanCard).filter(Boolean);
+    state.notices = (state.notices || []).filter((item) => item && typeof item.text === "string").slice(-40);
     state.levelSeen = Math.max(0, Math.round(Number(state.levelSeen) || 0));
     rollPlan();
+    rollWeekPlan();
     reopenRepeating();
     if (!state.settings.reminder) state.settings.reminder = { enabled: false, time: "09:00" };
     settleRest();
@@ -126,6 +146,8 @@
       } else {
         t.remaining = left;
       }
+    } else if (t.running && t.mode === "free" && t.freeOrigin) {
+      t.elapsed = Math.max(0, Math.round((Date.now() - t.freeOrigin) / 1000));
     } else if (!Number.isFinite(t.remaining) || t.remaining <= 0) {
       t.remaining = modeSeconds(t.mode);
       t.running = false;
@@ -240,6 +262,7 @@
       repeatDay: typeof task.repeatDay === "string" ? task.repeatDay : null,
       description: typeof task.description === "string" ? task.description.trim().slice(0, 280) : "",
       categoryId: typeof task.categoryId === "string" ? task.categoryId : null,
+      courseId: typeof task.courseId === "string" ? task.courseId : null,
       dueDate: /^\d{4}-\d{2}-\d{2}$/.test(task.dueDate) ? task.dueDate : null,
       completedOn: /^\d{4}-\d{2}-\d{2}$/.test(task.completedOn) ? task.completedOn : null,
     };
@@ -251,6 +274,90 @@
       id: typeof item.id === "string" && item.id ? item.id : "c" + Date.now(),
       name: item.name.trim().slice(0, 40),
     };
+  }
+
+  function cleanCourse(item) {
+    if (!item || typeof item.name !== "string" || !item.name.trim()) return null;
+    const topics = Array.isArray(item.topics)
+      ? item.topics
+          .filter((topic) => topic && typeof topic.text === "string" && topic.text.trim())
+          .map((topic) => ({
+            id: typeof topic.id === "string" && topic.id ? topic.id : "k" + Date.now(),
+            text: topic.text.trim().slice(0, 80),
+            done: Boolean(topic.done),
+          }))
+      : [];
+    return {
+      id: typeof item.id === "string" && item.id ? item.id : "d" + Date.now(),
+      name: item.name.trim().slice(0, 60),
+      goalMinutes: clamp(item.goalMinutes, 1, 5000, 60),
+      examDate: /^\d{4}-\d{2}-\d{2}$/.test(item.examDate) ? item.examDate : null,
+      topics,
+    };
+  }
+
+  function cleanNote(item) {
+    if (!item || typeof item.title !== "string" || !item.title.trim()) return null;
+    return {
+      id: typeof item.id === "string" && item.id ? item.id : "n" + Date.now(),
+      title: item.title.trim().slice(0, 80),
+      body: typeof item.body === "string" ? item.body.slice(0, 4000) : "",
+      courseId: typeof item.courseId === "string" ? item.courseId : null,
+      updatedAt: Number(item.updatedAt) || Date.now(),
+    };
+  }
+
+  function cleanCard(item) {
+    if (!item || typeof item.front !== "string" || !item.front.trim() || typeof item.back !== "string" || !item.back.trim()) return null;
+    return {
+      id: typeof item.id === "string" && item.id ? item.id : "f" + Date.now(),
+      courseId: typeof item.courseId === "string" ? item.courseId : null,
+      front: item.front.trim().slice(0, 200),
+      back: item.back.trim().slice(0, 400),
+      box: clamp(item.box, 0, 5, 0),
+      due: /^\d{4}-\d{2}-\d{2}$/.test(item.due) ? item.due : todayKey(),
+    };
+  }
+
+  function rollWeekPlan() {
+    const week = weekStart(todayKey());
+    const empty = [[], [], [], [], [], [], []];
+    if (!state.weekPlan || !Array.isArray(state.weekPlan.days) || state.weekPlan.days.length !== 7) {
+      state.weekPlan = { week, days: empty };
+      return;
+    }
+    state.weekPlan.days = state.weekPlan.days.map((list) => (Array.isArray(list) ? list.filter((id) => typeof id === "string") : []));
+    if (state.weekPlan.week !== week) state.weekPlan = { week, days: empty };
+  }
+
+  function placeWeekday(taskId, day) {
+    rollWeekPlan();
+    state.weekPlan.days.forEach((list, index) => {
+      state.weekPlan.days[index] = list.filter((id) => id !== taskId);
+    });
+    if (day === "" || day === null || day === undefined) return;
+    const index = Number(day);
+    if (Number.isInteger(index) && index >= 0 && index <= 6) state.weekPlan.days[index].push(taskId);
+  }
+
+  function pushNotice(text) {
+    const message = String(text || "").trim().slice(0, 160);
+    if (!message) return;
+    if (!Array.isArray(state.notices)) state.notices = [];
+    state.notices.push({ ts: Date.now(), text: message });
+    if (state.notices.length > 40) state.notices = state.notices.slice(-40);
+    save();
+  }
+
+  function exportCsv() {
+    const lines = ["tarih,dakika,gorev,ders,not,kesinti,puan"];
+    state.history.forEach((item) => {
+      const task = state.tasks.find((entry) => entry.id === item.taskId);
+      const course = task && state.courses.find((entry) => entry.id === task.courseId);
+      const cells = [item.date, item.minutes, task ? task.text : "", course ? course.name : "", item.note || "", item.pauses || 0, item.rating || ""];
+      lines.push(cells.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","));
+    });
+    return lines.join("\n");
   }
 
   function addCategory(name) {
@@ -267,11 +374,14 @@
     return {
       ts: Number(item.ts) || Date.now(),
       date: item.date,
-      mode: "focus",
+      mode: item.mode === "free" || item.free ? "free" : "focus",
       minutes: clamp(item.minutes, 1, 180, 25),
       taskId: typeof item.taskId === "string" ? item.taskId : null,
       note: typeof item.note === "string" ? item.note.trim().slice(0, 140) : "",
       sessionId: typeof item.sessionId === "string" ? item.sessionId : null,
+      pauses: Math.max(0, Math.round(Number(item.pauses) || 0)),
+      rating: clamp(item.rating, 1, 5, 0) || null,
+      free: Boolean(item.free),
     };
   }
 
@@ -284,6 +394,11 @@
       settings: state.settings,
       tasks: state.tasks,
       categories: state.categories,
+      courses: state.courses,
+      notes: state.notes,
+      cards: state.cards,
+      notices: state.notices,
+      weekPlan: state.weekPlan,
       activeTaskId: state.activeTaskId,
       plan: state.plan,
       previousPlan: state.previousPlan,
@@ -308,6 +423,17 @@
     if (!PALETTES.includes(next.settings.palette)) next.settings.palette = "violet";
     next.tasks = Array.isArray(data.tasks) ? data.tasks.map(cleanTask).filter(Boolean) : [];
     next.categories = Array.isArray(data.categories) ? data.categories.map(cleanCategory).filter(Boolean) : [];
+    next.courses = Array.isArray(data.courses) ? data.courses.map(cleanCourse).filter(Boolean) : [];
+    next.notes = Array.isArray(data.notes) ? data.notes.map(cleanNote).filter(Boolean) : [];
+    next.cards = Array.isArray(data.cards) ? data.cards.map(cleanCard).filter(Boolean) : [];
+    next.notices = Array.isArray(data.notices) ? data.notices.filter((item) => item && typeof item.text === "string").slice(-40) : [];
+    if (data.weekPlan && Array.isArray(data.weekPlan.days)) {
+      next.weekPlan = {
+        week: typeof data.weekPlan.week === "string" ? data.weekPlan.week : "",
+        days: data.weekPlan.days.slice(0, 7).map((list) => (Array.isArray(list) ? list.filter((id) => typeof id === "string") : [])),
+      };
+      while (next.weekPlan.days.length < 7) next.weekPlan.days.push([]);
+    }
     next.levelSeen = Math.max(0, Math.round(Number(data.levelSeen) || 0));
     next.history = Array.isArray(data.history)
       ? data.history.map(cleanSession).filter(Boolean).slice(-HISTORY_CAP)
@@ -345,6 +471,7 @@
 
     state = next;
     rollPlan();
+    rollWeekPlan();
     reopenRepeating();
     settleRest();
     save();
@@ -433,6 +560,10 @@
     copyPreviousPlan,
     dismissYesterday,
     addCategory,
+    placeWeekday,
+    pushNotice,
+    exportCsv,
+    rollWeekPlan,
     modeSeconds,
     todayKey,
     clone,

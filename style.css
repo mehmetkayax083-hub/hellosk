@@ -417,11 +417,14 @@ select.input { cursor: pointer; }
   position: relative;
   transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
 }
-.task-item.completed .task-check {
+.task-item.completed .task-check,
+.task-check.done {
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   border-color: transparent;
+  position: relative;
 }
-.task-item.completed .task-check::after {
+.task-item.completed .task-check::after,
+.task-check.done::after {
   content: "";
   position: absolute;
   left: 7px; top: 3px;
@@ -1084,3 +1087,37 @@ button.heat-cell:hover,
 @media (max-width: 860px) {
   .note-sheet { bottom: 88px; }
 }
+
+body.text-lg { font-size: 18px; }
+.rate-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.rate-row button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rate-row button.active { background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #fff; border-color: transparent; }
+.card-face {
+  min-height: 120px;
+  margin: 8px 0 16px;
+  padding: 22px;
+  border-radius: 18px;
+  background: var(--surface-2);
+  font-size: 1.2rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.card-stage .note-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.course-card { margin-bottom: 14px; }
+.topic-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+.topic-list li { display: flex; align-items: center; gap: 10px; }
+.topic-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.topic-row input { width: 18px; height: 18px; }
+.note-form, .course-card form { display: grid; gap: 10px; margin-bottom: 16px; }
+#saveFreeBtn { margin: 8px auto 0; display: block; }
+#freeModeBtn.active { background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #fff; border-color: transparent; }

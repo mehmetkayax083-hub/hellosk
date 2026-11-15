@@ -54,6 +54,9 @@
     if (view === "calendar" && FF.calendar) FF.calendar.render();
     if (view === "achievements" && FF.achievements) FF.achievements.render();
     if (view === "sounds" && FF.sounds) FF.sounds.render();
+    if (view === "courses" && FF.courses) FF.courses.render();
+    if (view === "notes" && FF.notes) FF.notes.render();
+    if (view === "cards" && FF.cards) FF.cards.render();
   }
 
   function applyTheme() {
@@ -63,11 +66,21 @@
     dom.body.dataset.theme = theme;
     dom.body.dataset.palette = palette;
     if (dom.themeColor) dom.themeColor.setAttribute("content", theme === "light" ? "#eef0fa" : "#0b0c1a");
+    dom.body.classList.toggle("text-lg", Boolean(settings.largeText));
   }
 
   function openNote() {
     noteIndex = FF.store.state.history.length - 1;
+    const session = FF.store.state.history[noteIndex];
+    const task = session && FF.store.state.tasks.find((item) => item.id === session.taskId);
     dom.noteInput.value = "";
+    const summary = document.getElementById("noteSummary");
+    if (summary && session) {
+      summary.textContent = `${session.minutes} dakika${task ? " · " + task.text : ""}. Kesinti: ${session.pauses || 0}.`;
+    }
+    document.querySelectorAll("#noteRate [data-rate]").forEach((button) => {
+      button.classList.toggle("active", session && String(session.rating) === button.dataset.rate);
+    });
     dom.noteSheet.hidden = false;
   }
 
@@ -99,7 +112,7 @@
   function celebrateGoalIfNeeded() {
     const state = FF.store.state;
     const today = FF.store.todayKey();
-    const count = state.history.filter((item) => item.date === today).length;
+    const count = state.history.filter((item) => item.date === today && item.mode !== "free").length;
     if (count >= state.settings.dailyGoal && state.goalCelebratedOn !== today) {
       state.goalCelebratedOn = today;
       FF.store.commit();
@@ -175,6 +188,8 @@
   }
 
   function toast(message) {
+    if (FF.store.pushNotice) FF.store.pushNotice(message);
+    if (FF.home && FF.home.render) FF.home.render();
     dom.toastText.textContent = message;
     dom.toast.hidden = false;
     dom.toast.classList.add("show");
@@ -199,7 +214,7 @@
       return;
     }
     const key = FF.store.shiftDay(today, -1);
-    const sessions = state.history.filter((item) => item.date === key);
+    const sessions = state.history.filter((item) => item.date === key && item.mode !== "free");
     if (!sessions.length) {
       dom.yesterday.hidden = true;
       return;
@@ -233,6 +248,16 @@
     dom.noteSheet.addEventListener("submit", (event) => {
       event.preventDefault();
       saveNote();
+    });
+    document.getElementById("noteRate").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-rate]");
+      const session = FF.store.state.history[noteIndex];
+      if (!button || !session) return;
+      session.rating = Number(button.dataset.rate);
+      FF.store.save();
+      document.querySelectorAll("#noteRate [data-rate]").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
     });
     dom.noteSkip.addEventListener("click", closeNote);
     dom.goalClose.addEventListener("click", closeGoal);
@@ -356,6 +381,9 @@
     FF.calendar.init();
     FF.achievements.init();
     FF.sounds.init();
+    FF.courses.init();
+    FF.notes.init();
+    FF.cards.init();
 
     bind();
     navigate("home");

@@ -143,17 +143,18 @@
     const today = FF.store.todayKey();
 
     const todaySessions = history.filter((h) => h.date === today);
+    const todayPomos = todaySessions.filter((h) => h.mode !== "free");
     const todayMin = todaySessions.reduce((a, h) => a + h.minutes, 0);
     dom.todayMin.textContent = todayMin;
-    dom.todayPomo.textContent = todaySessions.length;
-    dom.totalPomo.textContent = history.length;
+    dom.todayPomo.textContent = todayPomos.length;
+    dom.totalPomo.textContent = history.filter((h) => h.mode !== "free").length;
 
     // Günlük hedef halkası
     const goal = s.settings.dailyGoal;
-    const ratio = goal > 0 ? Math.min(todaySessions.length / goal, 1) : 0;
+    const ratio = goal > 0 ? Math.min(todayPomos.length / goal, 1) : 0;
     dom.goalBar.style.strokeDasharray = String(GOAL_CIRC);
     dom.goalBar.style.strokeDashoffset = String(GOAL_CIRC * (1 - ratio));
-    dom.goalText.textContent = `${todaySessions.length}/${goal}`;
+    dom.goalText.textContent = `${todayPomos.length}/${goal}`;
 
     // Son 7 gün
     const week = [];
@@ -181,12 +182,13 @@
     renderWeekTasks(history, today);
     renderCategories(history);
     renderHeatmap(history, today);
+    renderInsights(history, today);
 
     // Bu ay
     const month = today.slice(0, 7);
     const monthSessions = history.filter((h) => h.date.slice(0, 7) === month);
     dom.monthMin.textContent = `${monthSessions.reduce((a, h) => a + h.minutes, 0)} dk`;
-    dom.monthPomo.textContent = monthSessions.length;
+    dom.monthPomo.textContent = monthSessions.filter((h) => h.mode !== "free").length;
     dom.monthDays.textContent = new Set(monthSessions.map((h) => h.date)).size;
 
     // En verimli gün/saat
@@ -228,7 +230,7 @@
           `<li class="history-item">` +
           `<span class="hist-dot" aria-hidden="true"></span>` +
           `<span class="hist-body">` +
-          `<span class="hist-main">${h.minutes} dk odaklanma${task ? ` · ${escapeHtml(task.text)}` : ""}</span>` +
+          `<span class="hist-main">${h.minutes} dk ${h.mode === "free" ? "serbest çalışma" : "odaklanma"}${task ? ` · ${escapeHtml(task.text)}` : ""}</span>` +
           note +
           `</span>` +
           `<span class="hist-when">${when}</span>` +
@@ -242,14 +244,15 @@
     const start = FF.store.weekStart(today);
     const week = history.filter((item) => item.date >= start && item.date <= today);
     const goal = FF.store.state.settings.weeklyGoal || 30;
-    dom.weekGoal.textContent = `Bu hafta ${week.length}/${goal}`;
-    dom.weekGoal.classList.toggle("met", week.length >= goal);
+    const weekPomos = week.filter((item) => item.mode !== "free");
+    dom.weekGoal.textContent = `Bu hafta ${weekPomos.length}/${goal}`;
+    dom.weekGoal.classList.toggle("met", weekPomos.length >= goal);
 
     const buckets = new Map();
     week.forEach((item) => {
       const key = item.taskId || "";
       const row = buckets.get(key) || { id: key, count: 0, minutes: 0 };
-      row.count += 1;
+      if (item.mode !== "free") row.count += 1;
       row.minutes += item.minutes;
       buckets.set(key, row);
     });
@@ -361,6 +364,41 @@
   function clearHistory() {
     FF.store.state.history = [];
     FF.store.commit();
+  }
+
+  function renderInsights(history, today) {
+    const month = today.slice(0, 7);
+    const days = [...new Set(history.filter((item) => item.date.slice(0, 7) === month).map((item) => item.date))];
+    const goal = FF.store.state.settings.dailyGoal;
+    const hits = days.filter((day) => history.filter((item) => item.date === day && item.mode === "focus").length >= goal).length;
+    document.getElementById("monthGoalRate").textContent = days.length ? `%${Math.round((hits / days.length) * 100)}` : "%0";
+    const monthMinutes = history.filter((item) => item.date.slice(0, 7) === month).reduce((sum, item) => sum + item.minutes, 0);
+    document.getElementById("monthReport").textContent = days.length
+      ? `Bu ay ${days.length} gün çalıştın, hedef ${hits} günde tuttu. Toplam ${monthMinutes} dakika.`
+      : "Bu ay henüz kayıt yok.";
+    const abandoned = FF.store.state.tasks.filter(
+      (task) => !task.archived && !task.completed && task.donePomodoros > 0 && task.donePomodoros < task.targetPomodoros
+    );
+    document.getElementById("abandonedList").innerHTML = abandoned
+      .slice(0, 6)
+      .map((task) => `<li>${escapeHtml(task.text)} · ${task.donePomodoros}/${task.targetPomodoros}</li>`)
+      .join("");
+    document.getElementById("abandonedEmpty").hidden = abandoned.length > 0;
+    const minutesByDay = new Map();
+    const pomosByDay = new Map();
+    history.forEach((item) => {
+      minutesByDay.set(item.date, (minutesByDay.get(item.date) || 0) + item.minutes);
+      if (item.mode === "focus") pomosByDay.set(item.date, (pomosByDay.get(item.date) || 0) + 1);
+    });
+    const bestDay = [...minutesByDay.entries()].sort((a, b) => b[1] - a[1])[0];
+    const bestPomo = [...pomosByDay.entries()].sort((a, b) => b[1] - a[1])[0];
+    document.getElementById("recordList").innerHTML = [
+      bestDay ? `En uzun gün: ${bestDay[0]} · ${bestDay[1]} dk` : "En uzun gün henüz yok.",
+      bestPomo ? `En çok pomodoro: ${bestPomo[0]} · ${bestPomo[1]}` : "Pomodoro rekoru henüz yok.",
+      `En uzun seri: ${longestStreak(coveredDays())} gün`,
+    ]
+      .map((text) => `<li>${text}</li>`)
+      .join("");
   }
 
   function init() {

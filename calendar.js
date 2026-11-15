@@ -61,8 +61,9 @@
     const date = new Date(key + "T12:00:00");
     dom.detail.hidden = false;
     dom.detailTitle.textContent = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+    const pomodoros = info.sessions.filter((item) => item.mode !== "free");
     dom.detailStats.textContent = info.sessions.length
-      ? `${info.sessions.length} pomodoro · ${info.minutes} dk`
+      ? `${pomodoros.length} pomodoro · ${info.minutes} dk`
       : "Bu gün tamamlanmış oturum yok.";
     dom.tasks.innerHTML = info.tasks
       .map((task) => `<li>${escapeHtml(task.text)} <span>${task.completed ? "Tamam" : "Açık"}</span></li>`)
@@ -82,7 +83,7 @@
   function cell(key, label) {
     const info = dayStats(key);
     const today = key === FF.store.todayKey();
-    const level = heat(info.sessions.length);
+    const level = heat(info.sessions.filter((item) => item.mode !== "free").length);
     return (
       `<button type="button" class="cal-cell${level ? " lv" + level : ""}${today ? " today" : ""}${key === selected ? " selected" : ""}" data-date="${key}">` +
       `<span class="cal-num">${label}</span>` +
