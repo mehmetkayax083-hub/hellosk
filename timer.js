@@ -42,6 +42,7 @@
       activeTaskText: document.getElementById("activeTaskText"),
       activeTaskCount: document.getElementById("activeTaskCount"),
       planLine: document.getElementById("planLine"),
+      etaLine: document.getElementById("etaLine"),
       goalLine: document.getElementById("goalLine"),
       breath: document.getElementById("breath"),
       breathBox: document.getElementById("breathBox"),
@@ -83,6 +84,7 @@
     renderDots();
     renderActiveTask();
     renderPlan();
+    renderEta();
     renderGoal();
     syncBreath();
   }
@@ -133,6 +135,49 @@
     dom.planLine.hidden = false;
     dom.planLine.textContent =
       index >= 0 ? `Bugünün planı · ${index + 1}/${open.length}` : `Bugünün planı · ${open.length} görev`;
+  }
+
+  function planSeconds() {
+    const s = FF.store.state;
+    const today = FF.store.todayKey();
+    const order = s.plan && s.plan.date === today ? s.plan.order : [];
+    const open = order
+      .map((id) => s.tasks.find((task) => task.id === id))
+      .filter((task) => task && !task.completed && !task.archived && task.donePomodoros < task.targetPomodoros);
+    const pomos = open.reduce((sum, task) => sum + (task.targetPomodoros - task.donePomodoros), 0);
+    if (pomos <= 0) return 0;
+
+    const durations = s.settings.durations;
+    const interval = s.settings.longBreakInterval || 4;
+    const timer = s.timer;
+    const focusFull = durations.focus * 60;
+    const active = open.find((task) => task.id === s.activeTaskId);
+    const partial = timer.mode === "focus" && active && timer.remaining < focusFull;
+    let cycle = timer.mode === "long" ? 0 : timer.cycle;
+    let seconds = timer.mode !== "focus" ? timer.remaining : 0;
+
+    for (let i = 0; i < pomos; i++) {
+      seconds += i === 0 && partial ? timer.remaining : focusFull;
+      cycle += 1;
+      if (i < pomos - 1) {
+        seconds += (cycle % interval === 0 ? durations.long : durations.short) * 60;
+        if (cycle % interval === 0) cycle = 0;
+      }
+    }
+    return seconds;
+  }
+
+  function renderEta() {
+    const seconds = planSeconds();
+    if (!seconds) {
+      dom.etaLine.hidden = true;
+      return;
+    }
+    const end = new Date(Date.now() + seconds * 1000);
+    const hh = String(end.getHours()).padStart(2, "0");
+    const mm = String(end.getMinutes()).padStart(2, "0");
+    dom.etaLine.hidden = false;
+    dom.etaLine.textContent = `Plan ${hh}:${mm}'ta biter`;
   }
 
   function applyBreath() {
@@ -201,6 +246,7 @@
     dom.time.textContent = time;
     dom.bar.style.strokeDashoffset = String(CIRC * (1 - ratio));
     document.title = `${time} · ${PHASE[timer.mode]} — Focus Flow`;
+    renderEta();
   }
 
   function halt() {
@@ -323,6 +369,31 @@
     if (shouldAuto) start();
   }
 
+  function logManual() {
+    recordSession();
+    bumpActiveTask();
+    if (FF.store.state.history.length > FF.store.HISTORY_CAP) {
+      FF.store.state.history = FF.store.state.history.slice(-FF.store.HISTORY_CAP);
+    }
+    FF.store.commit();
+    if (FF.app && FF.app.toast) FF.app.toast("Pomodoro eklendi.");
+    if (FF.app && FF.app.celebrateGoalIfNeeded) FF.app.celebrateGoalIfNeeded();
+  }
+
+  function undoLast() {
+    const s = FF.store.state;
+    if (!s.history.length) return { ok: false, error: "Geri alınacak oturum yok." };
+    let index = 0;
+    s.history.forEach((item, i) => {
+      if ((item.ts || 0) >= (s.history[index].ts || 0)) index = i;
+    });
+    const last = s.history.splice(index, 1)[0];
+    const task = s.tasks.find((item) => item.id === last.taskId);
+    if (task && task.donePomodoros > 0) task.donePomodoros -= 1;
+    FF.store.commit();
+    return { ok: true };
+  }
+
   function recordSession() {
     const s = FF.store.state;
     s.history.push({
@@ -386,6 +457,8 @@
       setMode((t().cycle + 1) % interval === 0 ? "long" : "short");
     },
     hasWakeLock: () => !!wakeLock,
+    logManual,
+    undoLast,
     TIPS,
   };
 })();

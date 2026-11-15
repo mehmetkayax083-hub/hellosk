@@ -1,5 +1,5 @@
 /* Focus Flow — çevrimdışı kabuk. Ağ varsa taze dosyayı kullanır, yoksa önbelleğe döner. */
-const CACHE = "focus-flow-v5";
+const CACHE = "focus-flow-v6";
 const ASSETS = [
   "./",
   "./index.html",

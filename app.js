@@ -92,8 +92,7 @@
     dom.goalOverlay.hidden = true;
   }
 
-  function afterFocusComplete() {
-    openNote();
+  function celebrateGoalIfNeeded() {
     const state = FF.store.state;
     const today = FF.store.todayKey();
     const count = state.history.filter((item) => item.date === today).length;
@@ -102,6 +101,11 @@
       FF.store.commit();
       showGoal(count);
     }
+  }
+
+  function afterFocusComplete() {
+    openNote();
+    celebrateGoalIfNeeded();
   }
 
   function setFocusMode(on) {
@@ -313,6 +317,7 @@
       toast,
       celebrate,
       afterFocusComplete,
+      celebrateGoalIfNeeded,
       checkReminder,
     };
 

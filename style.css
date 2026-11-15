@@ -659,6 +659,7 @@ body.focus-mode .tabbar,
 body.focus-mode .motivation,
 body.focus-mode .active-task,
 body.focus-mode .plan-line,
+body.focus-mode .eta-line,
 body.focus-mode .yesterday { display: none; }
 body.focus-mode .app { grid-template-columns: 1fr; }
 body.focus-mode .content { padding-top: 10vh; }
@@ -687,6 +688,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [data-nav]:focu
   .task-form { grid-template-columns: 1fr 1fr; }
   .task-form .task-title { grid-column: 1 / -1; }
   .task-form .btn-primary { grid-column: 1 / -1; }
+  .task-edit { grid-template-columns: 1fr; }
+  .breakdown-item { flex-direction: column; gap: 2px; }
   .view-head h1 { font-size: 1.4rem; }
   .task-item { align-items: flex-start; }
   .task-main { flex: 1 1 calc(100% - 46px); }
@@ -705,13 +708,47 @@ button:focus-visible, input:focus-visible, select:focus-visible, [data-nav]:focu
   font-size: 0.88rem;
   font-weight: 600;
 }
+.eta-line,
 .goal-line {
-  margin: 0 0 18px;
+  margin: 0 0 8px;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 650;
 }
-.goal-line.met { color: var(--accent-a); }
+.goal-line { margin-bottom: 18px; }
+.goal-line.met,
+.panel-note.met { color: var(--accent-a); }
+.repeat-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.task-form .repeat-opt { grid-column: 1 / -1; }
+.repeat-badge {
+  color: var(--accent-a);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.task-edit {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 72px;
+  gap: 8px;
+  align-items: center;
+}
+.task-edit .edit-title { grid-column: 1 / -1; }
+.task-edit .edit-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.edit-target { width: 72px; }
+.history-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: -6px 0 14px; }
+#addManualBtn { color: var(--accent-a); }
+#addManualBtn:hover { color: var(--text); }
+.task-breakdown { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.breakdown-item { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.breakdown-name { font-weight: 650; }
+.breakdown-meta { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
 .yesterday {
   display: flex;
   align-items: center;

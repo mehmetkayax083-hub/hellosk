@@ -19,6 +19,7 @@
       theme: "dark",
       palette: "violet",
       dailyGoal: 8,
+      weeklyGoal: 30,
       focusMode: false,
       reminder: { enabled: false, time: "09:00" },
       chime: "bell",
@@ -100,7 +101,9 @@
     }
     if (!PALETTES.includes(state.settings.palette)) state.settings.palette = "violet";
     if (!CHIMES.includes(state.settings.chime)) state.settings.chime = "bell";
+    state.settings.weeklyGoal = clamp(state.settings.weeklyGoal, 1, 80, 30);
     rollPlan();
+    reopenRepeating();
     if (!state.settings.reminder) state.settings.reminder = { enabled: false, time: "09:00" };
     settleRest();
     // Çalışır durumdayken sayfa kapanmışsa: geçen süreyi düş.
@@ -172,6 +175,17 @@
     save();
   }
 
+  function reopenRepeating() {
+    const today = todayKey();
+    state.tasks.forEach((task) => {
+      if (!task || task.repeat !== "daily" || task.archived) return;
+      if (task.repeatDay === today) return;
+      task.completed = false;
+      task.donePomodoros = 0;
+      task.repeatDay = today;
+    });
+  }
+
   /* Basit olay yolu: değişiklik bildirimleri için. */
   const listeners = {};
   const bus = {
@@ -206,6 +220,8 @@
       completed: Boolean(task.completed),
       archived: Boolean(task.archived),
       createdAt: Number(task.createdAt) || Date.now(),
+      repeat: task.repeat === "daily" ? "daily" : null,
+      repeatDay: typeof task.repeatDay === "string" ? task.repeatDay : null,
     };
   }
 
@@ -287,6 +303,7 @@
 
     state = next;
     rollPlan();
+    reopenRepeating();
     settleRest();
     save();
     bus.emit("change");
@@ -370,6 +387,7 @@
     weekStart,
     shiftDay,
     rollPlan,
+    reopenRepeating,
     copyPreviousPlan,
     dismissYesterday,
     modeSeconds,

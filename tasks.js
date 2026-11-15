@@ -8,6 +8,7 @@
   let dom = {};
   let archiveOpen = false;
   let query = "";
+  let editingId = null;
 
   function cache() {
     dom = {
@@ -15,6 +16,7 @@
       input: document.getElementById("taskInput"),
       priority: document.getElementById("taskPriority"),
       target: document.getElementById("taskTarget"),
+      repeat: document.getElementById("taskRepeat"),
       list: document.getElementById("taskList"),
       empty: document.getElementById("taskEmpty"),
       summary: document.getElementById("planSummary"),
@@ -50,9 +52,30 @@
       completed: false,
       archived: false,
       createdAt: Date.now(),
+      repeat: dom.repeat.checked ? "daily" : null,
+      repeatDay: dom.repeat.checked ? FF.store.todayKey() : null,
     };
     s.tasks.push(task);
     if (!s.activeTaskId) s.activeTaskId = task.id;
+    dom.repeat.checked = false;
+    FF.store.commit();
+  }
+
+  function update(id, text, priority, target, repeat) {
+    const task = FF.store.state.tasks.find((item) => item.id === id);
+    const trimmed = text.trim();
+    if (!task || !trimmed) return;
+    task.text = trimmed.slice(0, 100);
+    task.priority = PRIO[priority] ? priority : "medium";
+    task.targetPomodoros = Math.min(Math.max(parseInt(target, 10) || 1, 1), 20);
+    if (repeat) {
+      if (task.repeat !== "daily") task.repeatDay = FF.store.todayKey();
+      task.repeat = "daily";
+    } else {
+      task.repeat = null;
+      task.repeatDay = null;
+    }
+    editingId = null;
     FF.store.commit();
   }
 
@@ -60,6 +83,7 @@
     const task = FF.store.state.tasks.find((x) => x.id === id);
     if (!task) return;
     task.completed = !task.completed;
+    if (task.completed && task.repeat === "daily") task.repeatDay = FF.store.todayKey();
     const s = FF.store.state;
     if (task.completed && s.plan && s.plan.date === FF.store.todayKey()) {
       s.plan.order = s.plan.order.filter((item) => item !== id);
@@ -201,6 +225,12 @@
         (task.id === s.activeTaskId && !task.completed ? " active" : "");
       li.dataset.id = task.id;
 
+      if (editingId === task.id) {
+        li.appendChild(editForm(task));
+        dom.list.appendChild(li);
+        return;
+      }
+
       const check = document.createElement("button");
       check.className = "task-check";
       check.type = "button";
@@ -223,6 +253,12 @@
       pomo.className = "task-pomo";
       pomo.textContent = `${task.donePomodoros}/${task.targetPomodoros} pomodoro`;
       meta.append(badge, pomo);
+      if (task.repeat === "daily") {
+        const repeat = document.createElement("span");
+        repeat.className = "repeat-badge";
+        repeat.textContent = "Her gün";
+        meta.appendChild(repeat);
+      }
       main.append(title, meta);
 
       const actions = document.createElement("div");
@@ -262,7 +298,9 @@
         focusBtn.disabled = task.id === s.activeTaskId;
         focusBtn.addEventListener("click", () => setActive(task.id));
         actions.appendChild(focusBtn);
+        actions.appendChild(editButton(task));
       } else {
+        actions.appendChild(editButton(task));
         const archiveBtn = document.createElement("button");
         archiveBtn.type = "button";
         archiveBtn.className = "task-focus";
@@ -310,6 +348,82 @@
       li.append(title, actions);
       dom.archiveList.appendChild(li);
     });
+  }
+
+  function editButton(task) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "task-focus";
+    button.textContent = "Düzenle";
+    button.addEventListener("click", () => {
+      editingId = task.id;
+      render();
+    });
+    return button;
+  }
+
+  function editForm(task) {
+    const form = document.createElement("form");
+    form.className = "task-edit";
+    form.autocomplete = "off";
+
+    const name = document.createElement("input");
+    name.className = "input edit-title";
+    name.type = "text";
+    name.maxLength = 100;
+    name.value = task.text;
+    name.setAttribute("aria-label", "Görev adı");
+
+    const priority = document.createElement("select");
+    priority.className = "input";
+    priority.setAttribute("aria-label", "Öncelik");
+    ["high", "medium", "low"].forEach((value) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = PRIO[value].label;
+      option.selected = task.priority === value;
+      priority.appendChild(option);
+    });
+
+    const target = document.createElement("input");
+    target.className = "input edit-target";
+    target.type = "number";
+    target.min = "1";
+    target.max = "20";
+    target.value = String(task.targetPomodoros);
+    target.setAttribute("aria-label", "Hedef pomodoro");
+
+    const repeatLabel = document.createElement("label");
+    repeatLabel.className = "repeat-opt";
+    const repeat = document.createElement("input");
+    repeat.type = "checkbox";
+    repeat.checked = task.repeat === "daily";
+    const repeatText = document.createElement("span");
+    repeatText.textContent = "Her gün";
+    repeatLabel.append(repeat, repeatText);
+
+    const actions = document.createElement("div");
+    actions.className = "edit-actions";
+    const save = document.createElement("button");
+    save.type = "submit";
+    save.className = "btn btn-primary";
+    save.textContent = "Kaydet";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn btn-line";
+    cancel.textContent = "Vazgeç";
+    cancel.addEventListener("click", () => {
+      editingId = null;
+      render();
+    });
+    actions.append(save, cancel, repeatLabel);
+
+    form.append(name, priority, target, actions);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      update(task.id, name.value, priority.value, target.value, repeat.checked);
+    });
+    return form;
   }
 
   function init() {

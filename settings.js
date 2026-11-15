@@ -13,6 +13,7 @@
       interval: document.getElementById("setInterval"),
       presets: document.querySelectorAll(".preset-btn"),
       goal: document.getElementById("setGoal"),
+      weekGoal: document.getElementById("setWeekGoal"),
       autoBreak: document.getElementById("setAutoBreak"),
       autoPomo: document.getElementById("setAutoPomo"),
       sound: document.getElementById("setSound"),
@@ -39,6 +40,7 @@
     dom.long.value = s.durations.long;
     dom.interval.value = s.longBreakInterval;
     dom.goal.value = s.dailyGoal;
+    dom.weekGoal.value = s.weeklyGoal || 30;
     dom.autoBreak.checked = s.autoStartBreaks;
     dom.autoPomo.checked = s.autoStartPomodoros;
     dom.sound.checked = s.sound;
@@ -95,6 +97,10 @@
 
     dom.goal.addEventListener("change", () => {
       s().dailyGoal = clampInt(dom.goal.value, 1, 30, 8);
+      FF.store.commit();
+    });
+    dom.weekGoal.addEventListener("change", () => {
+      s().weeklyGoal = clampInt(dom.weekGoal.value, 1, 80, 30);
       FF.store.commit();
     });
 

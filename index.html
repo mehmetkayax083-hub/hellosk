@@ -86,6 +86,7 @@
           <span class="active-task-count" id="activeTaskCount"></span>
         </div>
         <p class="plan-line" id="planLine" hidden></p>
+        <p class="eta-line" id="etaLine" hidden></p>
         <p class="goal-line" id="goalLine">Bugün 0/8</p>
 
         <div class="breath" id="breath" hidden>
@@ -127,6 +128,10 @@
                    aria-label="Hedef pomodoro sayısı">
           </label>
           <button class="btn btn-primary" type="submit">Ekle</button>
+          <label class="repeat-opt">
+            <input type="checkbox" id="taskRepeat">
+            Her gün tekrarla
+          </label>
         </form>
         <div class="plan-tools">
           <p class="plan-summary" id="planSummary" hidden></p>
@@ -181,6 +186,15 @@
             <span class="panel-note" id="weekTotal"></span>
           </div>
           <div class="bar-chart" id="weekChart" role="img" aria-label="Son 7 günün odaklanma grafiği"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Bu hafta görevler</h2>
+            <span class="panel-note" id="weekGoal">Bu hafta 0/30</span>
+          </div>
+          <ul class="task-breakdown" id="taskBreakdown"></ul>
+          <p class="empty" id="taskBreakdownEmpty" hidden>Bu hafta henüz görev kaydı yok.</p>
         </div>
 
         <div class="panel">
@@ -245,6 +259,10 @@
         <div class="panel">
           <div class="panel-head">
             <h2>Geçmiş</h2>
+          </div>
+          <div class="history-actions">
+            <button class="link-btn" id="addManualBtn" type="button">Pomodoro ekle</button>
+            <button class="link-btn" id="undoSessionBtn" type="button">Son oturumu geri al</button>
             <button class="link-btn" id="clearHistoryBtn" type="button">Temizle</button>
           </div>
           <ul class="history-list" id="historyList"></ul>
@@ -289,6 +307,10 @@
           <div class="field-row">
             <label for="setGoal">Günlük hedef (pomodoro)</label>
             <input class="input num" id="setGoal" type="number" min="1" max="30" inputmode="numeric">
+          </div>
+          <div class="field-row">
+            <label for="setWeekGoal">Haftalık hedef (pomodoro)</label>
+            <input class="input num" id="setWeekGoal" type="number" min="1" max="80" inputmode="numeric">
           </div>
           <div class="field-row toggle">
             <label for="setAutoBreak">Molaları otomatik başlat</label>

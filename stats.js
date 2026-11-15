@@ -19,6 +19,9 @@
       goalText: document.getElementById("goalText"),
       weekChart: document.getElementById("weekChart"),
       weekTotal: document.getElementById("weekTotal"),
+      weekGoal: document.getElementById("weekGoal"),
+      taskBreakdown: document.getElementById("taskBreakdown"),
+      taskBreakdownEmpty: document.getElementById("taskBreakdownEmpty"),
       monthMin: document.getElementById("monthMin"),
       monthPomo: document.getElementById("monthPomo"),
       monthDays: document.getElementById("monthDays"),
@@ -173,6 +176,7 @@
       .join("");
     const weekMin = week.reduce((a, d) => a + d.mins, 0);
     dom.weekTotal.textContent = `${weekMin} dk · ${Math.round(weekMin / 60 * 10) / 10} sa`;
+    renderWeekTasks(history, today);
     renderHeatmap(history, today);
 
     // Bu ay
@@ -225,6 +229,37 @@
           note +
           `</span>` +
           `<span class="hist-when">${when}</span>` +
+          `</li>`
+        );
+      })
+      .join("");
+  }
+
+  function renderWeekTasks(history, today) {
+    const start = FF.store.weekStart(today);
+    const week = history.filter((item) => item.date >= start && item.date <= today);
+    const goal = FF.store.state.settings.weeklyGoal || 30;
+    dom.weekGoal.textContent = `Bu hafta ${week.length}/${goal}`;
+    dom.weekGoal.classList.toggle("met", week.length >= goal);
+
+    const buckets = new Map();
+    week.forEach((item) => {
+      const key = item.taskId || "";
+      const row = buckets.get(key) || { id: key, count: 0, minutes: 0 };
+      row.count += 1;
+      row.minutes += item.minutes;
+      buckets.set(key, row);
+    });
+    const rows = Array.from(buckets.values()).sort((a, b) => b.count - a.count || b.minutes - a.minutes);
+    dom.taskBreakdownEmpty.hidden = rows.length > 0;
+    dom.taskBreakdown.innerHTML = rows
+      .map((row) => {
+        const task = row.id ? FF.store.state.tasks.find((item) => item.id === row.id) : null;
+        const name = !row.id ? "Görevsiz" : task ? task.text : "Silinmiş görev";
+        return (
+          `<li class="breakdown-item">` +
+          `<span class="breakdown-name">${escapeHtml(name)}</span>` +
+          `<span class="breakdown-meta">${row.count} pomodoro · ${row.minutes} dk</span>` +
           `</li>`
         );
       })
@@ -308,6 +343,12 @@
     const clearBtn = document.getElementById("clearHistoryBtn");
     clearBtn.addEventListener("click", () => {
       if (confirm("Tüm oturum geçmişi silinsin mi?")) clearHistory();
+    });
+    document.getElementById("addManualBtn").addEventListener("click", () => FF.timer.logManual());
+    document.getElementById("undoSessionBtn").addEventListener("click", () => {
+      const result = FF.timer.undoLast();
+      if (!result.ok && FF.app) FF.app.toast(result.error);
+      else if (FF.app) FF.app.toast("Son oturum geri alındı.");
     });
     dom.heatmap.addEventListener("click", (event) => {
       const cell = event.target.closest("[data-date]");
