@@ -3,11 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0e0f1e">
+  <meta name="theme-color" content="#0b0c1a" id="themeColor">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Focus Flow">
   <title>Focus Flow · Pomodoro</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
-<body data-view="timer" data-mode="focus" data-theme="dark">
+<body data-view="timer" data-mode="focus" data-theme="dark" data-palette="violet">
   <div class="app">
     <!-- Yan menü (masaüstü) / üst kimlik -->
     <aside class="sidebar">
@@ -75,6 +81,13 @@
           <span class="active-task-text" id="activeTaskText"></span>
           <span class="active-task-count" id="activeTaskCount"></span>
         </div>
+        <p class="plan-line" id="planLine" hidden></p>
+
+        <div class="breath" id="breath" hidden>
+          <div class="breath-box" id="breathBox"></div>
+          <p class="breath-label" id="breathLabel">Nefes al</p>
+          <p class="breath-hint">4 sn al · 4 sn tut · 4 sn ver · 4 sn tut</p>
+        </div>
 
         <div class="controls">
           <button class="btn btn-ghost" id="resetBtn" title="Sıfırla (R)" aria-label="Sıfırla">
@@ -109,6 +122,7 @@
           </label>
           <button class="btn btn-primary" type="submit">Ekle</button>
         </form>
+        <p class="plan-summary" id="planSummary" hidden></p>
 
         <ul class="task-list" id="taskList"></ul>
         <p class="empty" id="taskEmpty" hidden>Henüz görev yok. İlk görevini ekleyerek başla.</p>
@@ -152,6 +166,25 @@
             <span class="panel-note" id="weekTotal"></span>
           </div>
           <div class="bar-chart" id="weekChart" role="img" aria-label="Son 7 günün odaklanma grafiği"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Son bir yıl</h2>
+            <span class="panel-note" id="yearTotal"></span>
+          </div>
+          <div class="heatmap-scroll">
+            <div class="heatmap" id="heatmap" role="img" aria-label="Son bir yılın odaklanma haritası"></div>
+          </div>
+          <div class="heat-legend" aria-hidden="true">
+            <span>Az</span>
+            <i class="heat-cell"></i>
+            <i class="heat-cell l1"></i>
+            <i class="heat-cell l2"></i>
+            <i class="heat-cell l3"></i>
+            <i class="heat-cell l4"></i>
+            <span>Çok</span>
+          </div>
         </div>
 
         <div class="panel two-col">
@@ -262,9 +295,29 @@
             <label for="setTheme">Koyu tema</label>
             <input id="setTheme" type="checkbox" class="switch">
           </div>
+          <div class="field-row">
+            <span id="paletteLabel">Vurgu rengi</span>
+            <div class="palettes" role="radiogroup" aria-labelledby="paletteLabel">
+              <button type="button" class="swatch" data-palette="violet" role="radio" aria-label="Mor"></button>
+              <button type="button" class="swatch" data-palette="ocean" role="radio" aria-label="Okyanus"></button>
+              <button type="button" class="swatch" data-palette="forest" role="radio" aria-label="Orman"></button>
+            </div>
+          </div>
           <div class="field-row toggle">
             <label for="setFocusMode">Odak modu (sade ekran)</label>
             <input id="setFocusMode" type="checkbox" class="switch">
+          </div>
+          <p class="install-hint" id="installHint">Telefonda tarayıcı menüsünden “Ana ekrana ekle” ile uygulama gibi açılır. İnternet kesilse de sayaç ve kayıtlar yerinde kalır.</p>
+          <button class="btn btn-primary install-btn" id="installBtn" type="button" hidden>Ana ekrana ekle</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Yedek</h2></div>
+          <p class="panel-copy">Görevler, geçmiş ve ayarlar bu tarayıcıda durur. Bir kopyasını indirip sonra geri yükleyebilirsin.</p>
+          <div class="backup-actions">
+            <button class="btn btn-primary" id="exportBtn" type="button">Yedeği indir</button>
+            <label class="btn btn-line" for="importFile">Yedeği yükle</label>
+            <input id="importFile" type="file" accept="application/json,.json" hidden>
           </div>
         </div>
 
@@ -300,6 +353,24 @@
 
   <!-- Odak modundan çıkış -->
   <button class="focus-exit" id="focusExit" hidden aria-label="Odak modundan çık">Odak modundan çık</button>
+
+  <form class="note-sheet" id="noteSheet" hidden>
+    <label for="noteInput">Bu oturumda ne yaptın?</label>
+    <input class="input" id="noteInput" type="text" maxlength="140" placeholder="Kısa bir not…" autocomplete="off">
+    <div class="note-actions">
+      <button class="btn btn-line" id="noteSkip" type="button">Geç</button>
+      <button class="btn btn-primary" type="submit">Kaydet</button>
+    </div>
+  </form>
+
+  <div class="goal-overlay" id="goalOverlay" hidden>
+    <div class="goal-card" role="dialog" aria-modal="true" aria-labelledby="goalTitle">
+      <p class="goal-kicker">Hedef tamam</p>
+      <h2 id="goalTitle">Bugünkü hedefine ulaştın</h2>
+      <p class="goal-message" id="goalMessage"></p>
+      <button class="btn btn-primary" id="goalClose" type="button">Devam</button>
+    </div>
+  </div>
 
   <script src="store.js"></script>
   <script src="audio.js"></script>

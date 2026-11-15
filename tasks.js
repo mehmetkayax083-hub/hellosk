@@ -15,6 +15,7 @@
       target: document.getElementById("taskTarget"),
       list: document.getElementById("taskList"),
       empty: document.getElementById("taskEmpty"),
+      summary: document.getElementById("planSummary"),
     };
   }
 
@@ -50,9 +51,16 @@
     const task = FF.store.state.tasks.find((x) => x.id === id);
     if (!task) return;
     task.completed = !task.completed;
-    if (task.completed && FF.store.state.activeTaskId === id) {
-      const nextActive = FF.store.state.tasks.find((x) => !x.completed);
-      FF.store.state.activeTaskId = nextActive ? nextActive.id : null;
+    const s = FF.store.state;
+    if (task.completed && s.plan && s.plan.date === FF.store.todayKey()) {
+      s.plan.order = s.plan.order.filter((item) => item !== id);
+    }
+    if (task.completed && s.activeTaskId === id) {
+      const nextPlanned = (s.plan && s.plan.order) || [];
+      const nextActive =
+        s.tasks.find((item) => nextPlanned.includes(item.id) && !item.completed) ||
+        s.tasks.find((item) => !item.completed);
+      s.activeTaskId = nextActive ? nextActive.id : null;
     }
     FF.store.commit();
   }
@@ -60,9 +68,29 @@
   function remove(id) {
     const s = FF.store.state;
     s.tasks = s.tasks.filter((x) => x.id !== id);
+    if (s.plan) s.plan.order = s.plan.order.filter((item) => item !== id);
     if (s.activeTaskId === id) {
       const nextActive = s.tasks.find((x) => !x.completed);
       s.activeTaskId = nextActive ? nextActive.id : null;
+    }
+    FF.store.commit();
+  }
+
+  function todayPlan() {
+    const plan = FF.store.state.plan;
+    if (!plan || plan.date !== FF.store.todayKey()) return [];
+    return plan.order;
+  }
+
+  function togglePlan(id) {
+    const s = FF.store.state;
+    const today = FF.store.todayKey();
+    if (!s.plan || s.plan.date !== today) s.plan = { date: today, order: [] };
+    if (s.plan.order.includes(id)) {
+      s.plan.order = s.plan.order.filter((item) => item !== id);
+    } else {
+      s.plan.order.push(id);
+      if (!s.activeTaskId) s.activeTaskId = id;
     }
     FF.store.commit();
   }
@@ -79,6 +107,17 @@
     const items = sorted();
     dom.empty.hidden = items.length > 0;
     dom.list.innerHTML = "";
+
+    const planned = todayPlan();
+    const plannedOpen = planned.filter((id) => items.some((task) => task.id === id && !task.completed));
+    if (planned.length) {
+      dom.summary.hidden = false;
+      dom.summary.textContent = plannedOpen.length
+        ? `Bugün ${plannedOpen.length} görev planlandı`
+        : "Bugünün planı bitti";
+    } else {
+      dom.summary.hidden = true;
+    }
 
     items.forEach((task) => {
       const li = document.createElement("li");
@@ -116,6 +155,13 @@
       actions.className = "task-actions";
 
       if (!task.completed) {
+        const planBtn = document.createElement("button");
+        planBtn.className = "task-plan" + (planned.includes(task.id) ? " on" : "");
+        planBtn.type = "button";
+        planBtn.textContent = planned.includes(task.id) ? "Planda" : "Bugün";
+        planBtn.addEventListener("click", () => togglePlan(task.id));
+        actions.appendChild(planBtn);
+
         const focusBtn = document.createElement("button");
         focusBtn.className = "task-focus";
         focusBtn.type = "button";
@@ -151,5 +197,5 @@
     FF.bus.on("change", render);
   }
 
-  FF.tasks = { init, render, add, remove, toggleComplete, setActive };
+  FF.tasks = { init, render, add, remove, toggleComplete, setActive, togglePlan };
 })();

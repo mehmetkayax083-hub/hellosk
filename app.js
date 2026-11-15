@@ -6,6 +6,8 @@
   let dom = {};
   let toastTimer = null;
   let ambientPrimed = false;
+  let deferredPrompt = null;
+  let noteIndex = -1;
 
   function cache() {
     dom = {
@@ -21,6 +23,14 @@
       toastText: document.getElementById("toastText"),
       dial: document.querySelector(".dial"),
       focusExit: document.getElementById("focusExit"),
+      noteSheet: document.getElementById("noteSheet"),
+      noteInput: document.getElementById("noteInput"),
+      noteSkip: document.getElementById("noteSkip"),
+      goalOverlay: document.getElementById("goalOverlay"),
+      goalMessage: document.getElementById("goalMessage"),
+      goalClose: document.getElementById("goalClose"),
+      installBtn: document.getElementById("installBtn"),
+      themeColor: document.getElementById("themeColor"),
     };
   }
 
@@ -40,7 +50,55 @@
   }
 
   function applyTheme() {
-    dom.body.dataset.theme = FF.store.state.settings.theme === "light" ? "light" : "dark";
+    const settings = FF.store.state.settings;
+    const theme = settings.theme === "light" ? "light" : "dark";
+    const palette = FF.store.PALETTES.includes(settings.palette) ? settings.palette : "violet";
+    dom.body.dataset.theme = theme;
+    dom.body.dataset.palette = palette;
+    if (dom.themeColor) dom.themeColor.setAttribute("content", theme === "light" ? "#eef0fa" : "#0b0c1a");
+  }
+
+  function openNote() {
+    noteIndex = FF.store.state.history.length - 1;
+    dom.noteInput.value = "";
+    dom.noteSheet.hidden = false;
+  }
+
+  function closeNote() {
+    dom.noteSheet.hidden = true;
+    noteIndex = -1;
+  }
+
+  function saveNote() {
+    const text = dom.noteInput.value.trim().slice(0, 140);
+    const session = FF.store.state.history[noteIndex];
+    closeNote();
+    if (session && text) {
+      session.note = text;
+      FF.store.commit();
+    }
+  }
+
+  function showGoal(count) {
+    const streak = FF.stats.currentStreak();
+    dom.goalMessage.textContent = `${count} pomodoro tamamlandı. Serin ${streak} gün. Yarın da bir oturum seriyi sürdürür.`;
+    dom.goalOverlay.hidden = false;
+  }
+
+  function closeGoal() {
+    dom.goalOverlay.hidden = true;
+  }
+
+  function afterFocusComplete() {
+    openNote();
+    const state = FF.store.state;
+    const today = FF.store.todayKey();
+    const count = state.history.filter((item) => item.date === today).length;
+    if (count >= state.settings.dailyGoal && state.goalCelebratedOn !== today) {
+      state.goalCelebratedOn = today;
+      FF.store.commit();
+      showGoal(count);
+    }
   }
 
   function setFocusMode(on) {
@@ -118,10 +176,36 @@
     dom.reset.addEventListener("click", () => FF.timer.reset());
     dom.skip.addEventListener("click", () => FF.timer.skip());
     dom.focusExit.addEventListener("click", () => setFocusMode(false));
+    dom.noteSheet.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveNote();
+    });
+    dom.noteSkip.addEventListener("click", closeNote);
+    dom.goalClose.addEventListener("click", closeGoal);
+    dom.goalOverlay.addEventListener("click", (event) => {
+      if (event.target === dom.goalOverlay) closeGoal();
+    });
+    dom.installBtn.addEventListener("click", async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice.catch(() => {});
+      deferredPrompt = null;
+      dom.installBtn.hidden = true;
+    });
 
     window.addEventListener("pointerdown", primeAmbient, { once: false });
 
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (!dom.goalOverlay.hidden) {
+          closeGoal();
+          return;
+        }
+        if (!dom.noteSheet.hidden) {
+          closeNote();
+          return;
+        }
+      }
       const el = document.activeElement;
       const typing =
         el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
@@ -174,7 +258,18 @@
       notify,
       toast,
       celebrate,
+      afterFocusComplete,
     };
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      deferredPrompt = event;
+      dom.installBtn.hidden = false;
+    });
+
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    }
 
     applyTheme();
     dom.body.classList.toggle("focus-mode", FF.store.state.settings.focusMode);

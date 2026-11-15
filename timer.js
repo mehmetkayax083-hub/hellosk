@@ -7,7 +7,16 @@
 
   const PHASE = { focus: "Odaklanma", short: "Kısa Mola", long: "Uzun Mola" };
 
+  const BREATH = [
+    { cls: "inhale", label: "Nefes al" },
+    { cls: "hold-in", label: "Tut" },
+    { cls: "exhale", label: "Ver" },
+    { cls: "hold-out", label: "Tut" },
+  ];
+
   let intervalId = null;
+  let breathTimer = null;
+  let breathStep = 0;
   let dom = {};
 
   function cache() {
@@ -22,6 +31,10 @@
       activeTask: document.getElementById("activeTask"),
       activeTaskText: document.getElementById("activeTaskText"),
       activeTaskCount: document.getElementById("activeTaskCount"),
+      planLine: document.getElementById("planLine"),
+      breath: document.getElementById("breath"),
+      breathBox: document.getElementById("breathBox"),
+      breathLabel: document.getElementById("breathLabel"),
     };
   }
 
@@ -57,6 +70,8 @@
 
     renderDots();
     renderActiveTask();
+    renderPlan();
+    syncBreath();
   }
 
   function renderDots() {
@@ -82,6 +97,46 @@
     dom.activeTaskCount.textContent = `${task.donePomodoros}/${task.targetPomodoros}`;
   }
 
+  function renderPlan() {
+    const s = FF.store.state;
+    const today = FF.store.todayKey();
+    const order = s.plan && s.plan.date === today ? s.plan.order : [];
+    const open = order
+      .map((id) => s.tasks.find((task) => task.id === id))
+      .filter((task) => task && !task.completed);
+    if (!open.length) {
+      dom.planLine.hidden = true;
+      return;
+    }
+    const index = open.findIndex((task) => task.id === s.activeTaskId);
+    dom.planLine.hidden = false;
+    dom.planLine.textContent =
+      index >= 0 ? `Bugünün planı · ${index + 1}/${open.length}` : `Bugünün planı · ${open.length} görev`;
+  }
+
+  function applyBreath() {
+    const step = BREATH[breathStep];
+    dom.breathBox.className = "breath-box " + step.cls;
+    dom.breathLabel.textContent = step.label;
+  }
+
+  function syncBreath() {
+    const on = t().mode !== "focus";
+    dom.breath.hidden = !on;
+    if (on && !breathTimer) {
+      breathStep = 0;
+      applyBreath();
+      breathTimer = setInterval(() => {
+        breathStep = (breathStep + 1) % BREATH.length;
+        applyBreath();
+      }, 4000);
+    }
+    if (!on && breathTimer) {
+      clearInterval(breathTimer);
+      breathTimer = null;
+    }
+  }
+
   function tick() {
     const timer = t();
     timer.remaining = Math.max(0, Math.round((timer.endTime - Date.now()) / 1000));
@@ -98,6 +153,16 @@
     dom.time.textContent = time;
     dom.bar.style.strokeDashoffset = String(CIRC * (1 - ratio));
     document.title = `${time} · ${PHASE[timer.mode]} — Focus Flow`;
+  }
+
+  function halt() {
+    clearInterval(intervalId);
+    intervalId = null;
+    const timer = t();
+    if (timer) {
+      timer.running = false;
+      timer.endTime = null;
+    }
   }
 
   function start() {
@@ -198,6 +263,7 @@
     render();
     FF.store.commit();
 
+    if (finished === "focus" && FF.app && FF.app.afterFocusComplete) FF.app.afterFocusComplete();
     if (shouldAuto) start();
   }
 
@@ -209,14 +275,30 @@
       mode: "focus",
       minutes: s.settings.durations.focus,
       taskId: s.activeTaskId,
+      note: "",
     });
-    if (s.history.length > 1000) s.history = s.history.slice(-1000);
+    if (s.history.length > FF.store.HISTORY_CAP) s.history = s.history.slice(-FF.store.HISTORY_CAP);
   }
 
   function bumpActiveTask() {
     const s = FF.store.state;
     const task = s.tasks.find((x) => x.id === s.activeTaskId && !x.completed);
-    if (task) task.donePomodoros += 1;
+    if (!task) return;
+    task.donePomodoros += 1;
+    if (task.donePomodoros >= task.targetPomodoros) advancePlan(task.id);
+  }
+
+  function advancePlan(finishedId) {
+    const s = FF.store.state;
+    const today = FF.store.todayKey();
+    if (!s.plan || s.plan.date !== today || !s.plan.order.includes(finishedId)) return;
+    const open = (id) => {
+      const task = s.tasks.find((item) => item.id === id);
+      return task && !task.completed && task.donePomodoros < task.targetPomodoros;
+    };
+    const index = s.plan.order.indexOf(finishedId);
+    const next = s.plan.order.slice(index + 1).concat(s.plan.order.slice(0, index)).find(open);
+    if (next) s.activeTaskId = next;
   }
 
   function init() {
@@ -225,5 +307,15 @@
     FF.bus.on("change", render);
   }
 
-  FF.timer = { init, render, start, pause, toggle, reset, setMode, skip: () => setMode(nextModeAfter(t().mode)) };
+  FF.timer = {
+    init,
+    render,
+    start,
+    pause,
+    halt,
+    toggle,
+    reset,
+    setMode,
+    skip: () => setMode(nextModeAfter(t().mode)),
+  };
 })();

@@ -6,6 +6,7 @@
   const GOAL_CIRC = 2 * Math.PI * 34;
   const DAYS = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
   const DAYS_SHORT = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+  const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
   let dom = {};
 
@@ -27,6 +28,8 @@
       streakCount: document.getElementById("streakCount"),
       historyList: document.getElementById("historyList"),
       historyEmpty: document.getElementById("historyEmpty"),
+      heatmap: document.getElementById("heatmap"),
+      yearTotal: document.getElementById("yearTotal"),
     };
   }
 
@@ -65,6 +68,49 @@
       prev = k;
     }
     return best;
+  }
+
+  function heatLevel(count) {
+    if (count <= 0) return 0;
+    if (count === 1) return 1;
+    if (count <= 3) return 2;
+    if (count <= 6) return 3;
+    return 4;
+  }
+
+  function renderHeatmap(history, today) {
+    const end = new Date(today + "T00:00:00");
+    const sinceMonday = (end.getDay() + 6) % 7;
+    const start = new Date(end);
+    start.setDate(end.getDate() - sinceMonday - 52 * 7);
+
+    const byDate = {};
+    history.forEach((item) => {
+      const bucket = byDate[item.date] || (byDate[item.date] = { count: 0, minutes: 0 });
+      bucket.count += 1;
+      bucket.minutes += item.minutes;
+    });
+
+    let html = "";
+    let yearMinutes = 0;
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const key = dateKey(cursor);
+      const bucket = byDate[key] || { count: 0, minutes: 0 };
+      yearMinutes += bucket.minutes;
+      const level = heatLevel(bucket.count);
+      const label = `${cursor.getDate()} ${MONTHS[cursor.getMonth()]} · ${bucket.count} pomodoro · ${bucket.minutes} dk`;
+      html += `<span class="heat-cell${level ? " l" + level : ""}${key === today ? " today" : ""}" title="${label}"></span>`;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    dom.heatmap.innerHTML = html;
+    dom.heatmap.setAttribute("aria-label", `Son bir yıl, ${yearMinutes} dakika odaklanma`);
+    dom.yearTotal.textContent = `${yearMinutes} dk`;
+  }
+
+  function currentStreak() {
+    const dateSet = new Set(FF.store.state.history.map((item) => item.date));
+    return computeStreak(dateSet);
   }
 
   function render() {
@@ -108,6 +154,7 @@
       .join("");
     const weekMin = week.reduce((a, d) => a + d.mins, 0);
     dom.weekTotal.textContent = `${weekMin} dk · ${Math.round(weekMin / 60 * 10) / 10} sa`;
+    renderHeatmap(history, today);
 
     // Bu ay
     const month = today.slice(0, 7);
@@ -149,10 +196,14 @@
         const d = new Date(h.ts);
         const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         const when = h.date === today ? `Bugün ${time}` : `${h.date} ${time}`;
+        const note = h.note ? `<span class="hist-note">${escapeHtml(h.note)}</span>` : "";
         return (
           `<li class="history-item">` +
           `<span class="hist-dot" aria-hidden="true"></span>` +
+          `<span class="hist-body">` +
           `<span class="hist-main">${h.minutes} dk odaklanma${task ? ` · ${escapeHtml(task.text)}` : ""}</span>` +
+          note +
+          `</span>` +
           `<span class="hist-when">${when}</span>` +
           `</li>`
         );
@@ -179,5 +230,5 @@
     FF.bus.on("change", render);
   }
 
-  FF.stats = { init, render };
+  FF.stats = { init, render, currentStreak };
 })();

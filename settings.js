@@ -21,6 +21,9 @@
       ambientVol: document.getElementById("setAmbientVol"),
       theme: document.getElementById("setTheme"),
       focusMode: document.getElementById("setFocusMode"),
+      swatches: document.querySelectorAll(".swatch"),
+      exportBtn: document.getElementById("exportBtn"),
+      importFile: document.getElementById("importFile"),
       resetAll: document.getElementById("resetAllBtn"),
     };
   }
@@ -41,6 +44,11 @@
     dom.ambientVol.value = s.ambientVolume;
     dom.theme.checked = s.theme === "dark";
     dom.focusMode.checked = s.focusMode;
+    dom.swatches.forEach((btn) => {
+      const on = btn.dataset.palette === s.palette;
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-checked", String(on));
+    });
   }
 
   function clampInt(value, min, max, fallback) {
@@ -117,6 +125,15 @@
       FF.app.applyTheme();
       FF.store.save();
     });
+    dom.swatches.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        s().palette = btn.dataset.palette;
+        FF.app.applyTheme();
+        FF.store.commit();
+      });
+    });
+    dom.exportBtn.addEventListener("click", downloadBackup);
+    dom.importFile.addEventListener("change", importBackup);
     dom.focusMode.addEventListener("change", () => {
       FF.app.setFocusMode(dom.focusMode.checked);
     });
@@ -126,6 +143,39 @@
       FF.store.resetAll();
       location.reload();
     });
+  }
+
+  function downloadBackup() {
+    const payload = FF.store.exportData();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `focus-flow-${FF.store.todayKey()}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+  }
+
+  function importBackup() {
+    const file = dom.importFile.files && dom.importFile.files[0];
+    dom.importFile.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data = null;
+      try {
+        data = JSON.parse(String(reader.result));
+      } catch {
+        data = null;
+      }
+      if (!data) {
+        FF.app.toast("Dosya okunamadı.");
+        return;
+      }
+      if (!confirm("Mevcut veriler bu yedekle değiştirilsin mi?")) return;
+      const result = FF.store.importData(data);
+      FF.app.toast(result.ok ? "Yedek yüklendi." : result.error);
+    };
+    reader.readAsText(file);
   }
 
   function init() {
