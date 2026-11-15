@@ -22,25 +22,31 @@
     ensureCtx();
   }
 
-  function playChime(volume) {
+  const VOICES = {
+    bell: { type: "sine", notes: [660, 880, 1046], gap: 0.18, dur: 0.5, level: 0.5 },
+    soft: { type: "triangle", notes: [392, 494, 587], gap: 0.28, dur: 0.7, level: 0.45 },
+    digital: { type: "square", notes: [880, 880, 1175], gap: 0.12, dur: 0.16, level: 0.18 },
+  };
+
+  function playChime(volume, style) {
     const ac = ensureCtx();
     if (!ac) return;
     const vol = typeof volume === "number" ? volume : 0.6;
     if (vol <= 0) return;
-    const notes = [660, 880, 1046];
+    const voice = VOICES[style] || VOICES.bell;
     const now = ac.currentTime;
-    notes.forEach((freq, i) => {
+    voice.notes.forEach((freq, i) => {
       const osc = ac.createOscillator();
       const gain = ac.createGain();
-      const at = now + i * 0.18;
-      osc.type = "sine";
+      const at = now + i * voice.gap;
+      osc.type = voice.type;
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.5 * vol, at + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.5);
+      gain.gain.exponentialRampToValueAtTime(voice.level * vol, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + voice.dur);
       osc.connect(gain).connect(ac.destination);
       osc.start(at);
-      osc.stop(at + 0.5);
+      osc.stop(at + voice.dur);
     });
   }
 

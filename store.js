@@ -21,10 +21,13 @@
       dailyGoal: 8,
       focusMode: false,
       reminder: { enabled: false, time: "09:00" },
+      chime: "bell",
     },
     tasks: [],
     activeTaskId: null,
     plan: { date: "", order: [] },
+    previousPlan: { date: "", order: [] },
+    yesterdayDismissed: null,
     rest: { week: "", credits: 1, days: [] },
     goalCelebratedOn: null,
     reminderSentOn: null,
@@ -39,6 +42,7 @@
   };
 
   const PALETTES = ["violet", "ocean", "forest"];
+  const CHIMES = ["bell", "soft", "digital"];
   const HISTORY_CAP = 4000;
 
   const MOTIVATIONS = [
@@ -90,9 +94,13 @@
       state.tasks = Array.isArray(saved.tasks) ? saved.tasks : [];
       state.history = Array.isArray(saved.history) ? saved.history : [];
       if (!state.plan || !Array.isArray(state.plan.order)) state.plan = { date: "", order: [] };
+      if (!state.previousPlan || !Array.isArray(state.previousPlan.order)) {
+        state.previousPlan = { date: "", order: [] };
+      }
     }
     if (!PALETTES.includes(state.settings.palette)) state.settings.palette = "violet";
-    if (!state.plan || state.plan.date !== todayKey()) state.plan = { date: todayKey(), order: [] };
+    if (!CHIMES.includes(state.settings.chime)) state.settings.chime = "bell";
+    rollPlan();
     if (!state.settings.reminder) state.settings.reminder = { enabled: false, time: "09:00" };
     settleRest();
     // Çalışır durumdayken sayfa kapanmışsa: geçen süreyi düş.
@@ -123,6 +131,45 @@
     const date = d ? new Date(d) : new Date();
     date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
     return date.toISOString().slice(0, 10);
+  }
+
+  function shiftDay(key, delta) {
+    const date = new Date(key + "T12:00:00");
+    date.setDate(date.getDate() + delta);
+    return todayKey(date);
+  }
+
+  function rollPlan() {
+    if (!state.plan || !Array.isArray(state.plan.order)) state.plan = { date: "", order: [] };
+    if (!state.previousPlan || !Array.isArray(state.previousPlan.order)) {
+      state.previousPlan = { date: "", order: [] };
+    }
+    if (state.plan.date && state.plan.date !== todayKey()) {
+      if (state.plan.order.length) {
+        state.previousPlan = { date: state.plan.date, order: state.plan.order.slice() };
+      }
+      state.plan = { date: todayKey(), order: [] };
+    } else if (!state.plan.date) {
+      state.plan.date = todayKey();
+    }
+  }
+
+  function copyPreviousPlan() {
+    const previous = state.previousPlan;
+    if (!previous || !previous.order.length) return { ok: false, error: "Dünden aktarılacak plan yok." };
+    const open = previous.order.filter((id) =>
+      state.tasks.some((task) => task.id === id && !task.completed && !task.archived)
+    );
+    if (!open.length) return { ok: false, error: "Dünün planında açık görev kalmadı." };
+    state.plan = { date: todayKey(), order: open };
+    if (!open.includes(state.activeTaskId)) state.activeTaskId = open[0];
+    commit();
+    return { ok: true };
+  }
+
+  function dismissYesterday() {
+    state.yesterdayDismissed = todayKey();
+    save();
   }
 
   /* Basit olay yolu: değişiklik bildirimleri için. */
@@ -184,6 +231,8 @@
       tasks: state.tasks,
       activeTaskId: state.activeTaskId,
       plan: state.plan,
+      previousPlan: state.previousPlan,
+      yesterdayDismissed: state.yesterdayDismissed,
       goalCelebratedOn: state.goalCelebratedOn,
       reminderSentOn: state.reminderSentOn,
       rest: state.rest,
@@ -211,7 +260,14 @@
       date: typeof data.plan?.date === "string" ? data.plan.date : todayKey(),
       order,
     };
-    if (next.plan.date !== todayKey()) next.plan = { date: todayKey(), order: [] };
+    next.previousPlan = {
+      date: typeof data.previousPlan?.date === "string" ? data.previousPlan.date : "",
+      order: Array.isArray(data.previousPlan?.order)
+        ? data.previousPlan.order.filter((id) => typeof id === "string")
+        : [],
+    };
+    next.yesterdayDismissed = typeof data.yesterdayDismissed === "string" ? data.yesterdayDismissed : null;
+    if (!CHIMES.includes(next.settings.chime)) next.settings.chime = "bell";
     next.goalCelebratedOn = typeof data.goalCelebratedOn === "string" ? data.goalCelebratedOn : null;
     next.reminderSentOn = typeof data.reminderSentOn === "string" ? data.reminderSentOn : null;
     next.rest = {
@@ -230,6 +286,7 @@
     next.timer.remaining = Number.isFinite(remaining) && remaining > 0 ? remaining : next.settings.durations[mode] * 60;
 
     state = next;
+    rollPlan();
     settleRest();
     save();
     bus.emit("change");
@@ -299,6 +356,7 @@
     MOTIVATIONS,
     PALETTES,
     PRESETS,
+    CHIMES,
     HISTORY_CAP,
     load,
     save,
@@ -310,6 +368,10 @@
     toggleRest,
     clearRestToday,
     weekStart,
+    shiftDay,
+    rollPlan,
+    copyPreviousPlan,
+    dismissYesterday,
     modeSeconds,
     todayKey,
     clone,

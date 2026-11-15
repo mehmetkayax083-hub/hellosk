@@ -16,6 +16,7 @@
       autoBreak: document.getElementById("setAutoBreak"),
       autoPomo: document.getElementById("setAutoPomo"),
       sound: document.getElementById("setSound"),
+      chime: document.getElementById("setChime"),
       volume: document.getElementById("setVolume"),
       notif: document.getElementById("setNotif"),
       reminder: document.getElementById("setReminder"),
@@ -41,6 +42,7 @@
     dom.autoBreak.checked = s.autoStartBreaks;
     dom.autoPomo.checked = s.autoStartPomodoros;
     dom.sound.checked = s.sound;
+    dom.chime.value = FF.store.CHIMES.includes(s.chime) ? s.chime : "bell";
     dom.volume.value = s.volume;
     dom.notif.checked = s.notifications;
     dom.reminder.checked = !!(s.reminder && s.reminder.enabled);
@@ -107,14 +109,19 @@
 
     dom.sound.addEventListener("change", () => {
       s().sound = dom.sound.checked;
-      if (dom.sound.checked) FF.audio.playChime(s().volume);
+      if (dom.sound.checked) FF.audio.playChime(s().volume, s().chime);
       FF.store.save();
     });
     dom.volume.addEventListener("input", () => {
       s().volume = Number(dom.volume.value);
       FF.store.save();
     });
-    dom.volume.addEventListener("change", () => FF.audio.playChime(s().volume));
+    dom.volume.addEventListener("change", () => FF.audio.playChime(s().volume, s().chime));
+    dom.chime.addEventListener("change", () => {
+      s().chime = FF.store.CHIMES.includes(dom.chime.value) ? dom.chime.value : "bell";
+      if (s().sound) FF.audio.playChime(s().volume, s().chime);
+      FF.store.save();
+    });
 
     dom.presets.forEach((btn) => {
       btn.addEventListener("click", () => applyPreset(btn.dataset.preset));

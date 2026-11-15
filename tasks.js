@@ -7,6 +7,7 @@
 
   let dom = {};
   let archiveOpen = false;
+  let query = "";
 
   function cache() {
     dom = {
@@ -17,6 +18,8 @@
       list: document.getElementById("taskList"),
       empty: document.getElementById("taskEmpty"),
       summary: document.getElementById("planSummary"),
+      copyPlan: document.getElementById("copyPlanBtn"),
+      search: document.getElementById("taskSearch"),
       archiveBar: document.getElementById("archiveBar"),
       archiveDone: document.getElementById("archiveDoneBtn"),
       toggleArchive: document.getElementById("toggleArchiveBtn"),
@@ -134,6 +137,27 @@
     FF.store.commit();
   }
 
+  function nextInPlan() {
+    const order = todayPlan().filter((id) => {
+      const task = FF.store.state.tasks.find((item) => item.id === id);
+      return task && !task.completed && !task.archived;
+    });
+    if (!order.length) return;
+    const index = order.indexOf(FF.store.state.activeTaskId);
+    FF.store.state.activeTaskId = order[(index + 1) % order.length];
+    FF.store.commit();
+  }
+
+  function canCopyPlan() {
+    const previous = FF.store.state.previousPlan;
+    if (!previous || !previous.order.length) return false;
+    if ((FF.store.state.plan.order || []).length) return false;
+    return previous.order.some((id) => {
+      const task = FF.store.state.tasks.find((item) => item.id === id);
+      return task && !task.completed && !task.archived;
+    });
+  }
+
   function setActive(id) {
     const task = FF.store.state.tasks.find((x) => x.id === id);
     if (!task || task.completed) return;
@@ -143,10 +167,14 @@
 
   function render() {
     const s = FF.store.state;
-    const items = sorted();
+    const openTasks = sorted();
+    const items = openTasks.filter((task) => !query || task.text.toLowerCase().includes(query));
     const archived = FF.store.state.tasks.filter((task) => task.archived);
-    const completedCount = items.filter((task) => task.completed).length;
+    const completedCount = openTasks.filter((task) => task.completed).length;
+    const hasTasks = FF.store.state.tasks.some((task) => !task.archived);
     dom.empty.hidden = items.length > 0;
+    dom.empty.textContent = query && hasTasks ? "Eşleşen görev yok." : "Henüz görev yok. İlk görevini ekleyerek başla.";
+    dom.copyPlan.hidden = !canCopyPlan();
     dom.archiveBar.hidden = completedCount === 0 && archived.length === 0;
     dom.archiveDone.hidden = completedCount === 0;
     dom.toggleArchive.hidden = archived.length === 0;
@@ -293,6 +321,14 @@
       dom.target.value = "1";
       dom.input.focus();
     });
+    dom.search.addEventListener("input", () => {
+      query = dom.search.value.trim().toLowerCase();
+      render();
+    });
+    dom.copyPlan.addEventListener("click", () => {
+      const result = FF.store.copyPreviousPlan();
+      if (!result.ok && FF.app) FF.app.toast(result.error);
+    });
     dom.archiveDone.addEventListener("click", archiveCompleted);
     dom.toggleArchive.addEventListener("click", () => {
       archiveOpen = !archiveOpen;
@@ -302,5 +338,17 @@
     FF.bus.on("change", render);
   }
 
-  FF.tasks = { init, render, add, remove, toggleComplete, setActive, togglePlan, movePlan, archiveCompleted, restore };
+  FF.tasks = {
+    init,
+    render,
+    add,
+    remove,
+    toggleComplete,
+    setActive,
+    togglePlan,
+    movePlan,
+    archiveCompleted,
+    restore,
+    nextInPlan,
+  };
 })();

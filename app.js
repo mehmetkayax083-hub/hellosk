@@ -23,6 +23,9 @@
       toastText: document.getElementById("toastText"),
       dial: document.querySelector(".dial"),
       focusExit: document.getElementById("focusExit"),
+      yesterday: document.getElementById("yesterday"),
+      yesterdayText: document.getElementById("yesterdayText"),
+      yesterdayClose: document.getElementById("yesterdayClose"),
       noteSheet: document.getElementById("noteSheet"),
       noteInput: document.getElementById("noteInput"),
       noteSkip: document.getElementById("noteSkip"),
@@ -180,6 +183,24 @@
     dom.dial.classList.add("celebrate");
   }
 
+  function renderYesterday() {
+    const state = FF.store.state;
+    const today = FF.store.todayKey();
+    if (state.yesterdayDismissed === today) {
+      dom.yesterday.hidden = true;
+      return;
+    }
+    const key = FF.store.shiftDay(today, -1);
+    const sessions = state.history.filter((item) => item.date === key);
+    if (!sessions.length) {
+      dom.yesterday.hidden = true;
+      return;
+    }
+    const minutes = sessions.reduce((sum, item) => sum + item.minutes, 0);
+    dom.yesterdayText.textContent = `Dün ${sessions.length} pomodoro, ${minutes} dakika.`;
+    dom.yesterday.hidden = false;
+  }
+
   function setMotivation() {
     const quotes = FF.store.MOTIVATIONS;
     const dayIndex = Math.floor(Date.now() / 86400000) % quotes.length;
@@ -197,6 +218,10 @@
     dom.reset.addEventListener("click", () => FF.timer.reset());
     dom.skip.addEventListener("click", () => FF.timer.skip());
     dom.focusExit.addEventListener("click", () => setFocusMode(false));
+    dom.yesterdayClose.addEventListener("click", () => {
+      FF.store.dismissYesterday();
+      dom.yesterday.hidden = true;
+    });
     dom.noteSheet.addEventListener("submit", (event) => {
       event.preventDefault();
       saveNote();
@@ -241,6 +266,14 @@
         case "r":
         case "R":
           FF.timer.reset();
+          break;
+        case "s":
+        case "S":
+          FF.timer.skip();
+          break;
+        case "n":
+        case "N":
+          FF.tasks.nextInPlan();
           break;
         case "1":
           FF.timer.setMode("focus");
@@ -303,6 +336,8 @@
     dom.body.classList.toggle("focus-mode", FF.store.state.settings.focusMode);
     dom.focusExit.hidden = !FF.store.state.settings.focusMode;
     setMotivation();
+    renderYesterday();
+    FF.bus.on("change", renderYesterday);
 
     FF.timer.init();
     FF.tasks.init();

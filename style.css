@@ -658,7 +658,8 @@ body.focus-mode .sidebar,
 body.focus-mode .tabbar,
 body.focus-mode .motivation,
 body.focus-mode .active-task,
-body.focus-mode .plan-line { display: none; }
+body.focus-mode .plan-line,
+body.focus-mode .yesterday { display: none; }
 body.focus-mode .app { grid-template-columns: 1fr; }
 body.focus-mode .content { padding-top: 10vh; }
 
@@ -699,11 +700,47 @@ button:focus-visible, input:focus-visible, select:focus-visible, [data-nav]:focu
 
 /* ===================== Nefes, plan, harita, yedek ===================== */
 .plan-line {
-  margin: -8px 0 18px;
+  margin: -8px 0 8px;
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 600;
 }
+.goal-line {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+.goal-line.met { color: var(--accent-a); }
+.yesterday {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(440px, 100%);
+  margin: -8px auto 18px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: left;
+}
+.yesterday-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.plan-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.plan-tools:not(:has(:not([hidden]))) { display: none; }
+.plan-tools .plan-summary { margin: 0; }
+#copyPlanBtn { color: var(--accent-a); font-weight: 650; }
+#copyPlanBtn:hover { color: var(--text); }
+.task-search { width: 100%; margin-bottom: 14px; }
 
 .breath {
   display: flex;

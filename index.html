@@ -51,6 +51,10 @@
       <!-- ZAMANLAYICI -->
       <section class="view view-timer" data-view-panel="timer">
         <p class="motivation" id="motivation"></p>
+        <div class="yesterday" id="yesterday" hidden>
+          <p id="yesterdayText"></p>
+          <button class="yesterday-close" id="yesterdayClose" type="button" aria-label="Dünün özetini kapat">×</button>
+        </div>
 
         <div class="modes" role="tablist" aria-label="Mod seçimi">
           <button class="mode-btn active" role="tab" aria-selected="true" data-mode="focus">Odaklanma</button>
@@ -82,6 +86,7 @@
           <span class="active-task-count" id="activeTaskCount"></span>
         </div>
         <p class="plan-line" id="planLine" hidden></p>
+        <p class="goal-line" id="goalLine">Bugün 0/8</p>
 
         <div class="breath" id="breath" hidden>
           <div class="breath-box" id="breathBox"></div>
@@ -123,7 +128,11 @@
           </label>
           <button class="btn btn-primary" type="submit">Ekle</button>
         </form>
-        <p class="plan-summary" id="planSummary" hidden></p>
+        <div class="plan-tools">
+          <p class="plan-summary" id="planSummary" hidden></p>
+          <button class="link-btn" id="copyPlanBtn" type="button" hidden>Dünün planını getir</button>
+        </div>
+        <input class="input task-search" id="taskSearch" type="search" placeholder="Görev ara…" aria-label="Görev ara">
         <div class="archive-bar" id="archiveBar" hidden>
           <button class="link-btn" id="archiveDoneBtn" type="button" hidden>Tamamlananları arşivle</button>
           <button class="link-btn" id="toggleArchiveBtn" type="button">Arşiv</button>
@@ -298,6 +307,14 @@
             <input id="setSound" type="checkbox" class="switch">
           </div>
           <div class="field-row">
+            <label for="setChime">Ses tipi</label>
+            <select class="input" id="setChime">
+              <option value="bell">Zil</option>
+              <option value="soft">Yumuşak</option>
+              <option value="digital">Dijital</option>
+            </select>
+          </div>
+          <div class="field-row">
             <label for="setVolume">Ses seviyesi</label>
             <input id="setVolume" type="range" min="0" max="1" step="0.05" class="range">
           </div>
@@ -367,6 +384,8 @@
           <ul>
             <li><kbd>Boşluk</kbd> Başlat / Duraklat</li>
             <li><kbd>R</kbd> Sıfırla</li>
+            <li><kbd>S</kbd> Sonraki moda atla</li>
+            <li><kbd>N</kbd> Sıradaki görev</li>
             <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Mod seç</li>
             <li><kbd>F</kbd> Odak modu</li>
             <li><kbd>T</kbd> Tema değiştir</li>

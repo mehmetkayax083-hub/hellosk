@@ -42,6 +42,7 @@
       activeTaskText: document.getElementById("activeTaskText"),
       activeTaskCount: document.getElementById("activeTaskCount"),
       planLine: document.getElementById("planLine"),
+      goalLine: document.getElementById("goalLine"),
       breath: document.getElementById("breath"),
       breathBox: document.getElementById("breathBox"),
       breathLabel: document.getElementById("breathLabel"),
@@ -82,7 +83,16 @@
     renderDots();
     renderActiveTask();
     renderPlan();
+    renderGoal();
     syncBreath();
+  }
+
+  function renderGoal() {
+    const today = FF.store.todayKey();
+    const count = FF.store.state.history.filter((item) => item.date === today).length;
+    const goal = FF.store.state.settings.dailyGoal;
+    dom.goalLine.textContent = `Bugün ${count}/${goal}`;
+    dom.goalLine.classList.toggle("met", count >= goal);
   }
 
   function renderDots() {
@@ -285,7 +295,7 @@
     }
 
     const settings = FF.store.state.settings;
-    if (settings.sound) FF.audio.playChime(settings.volume);
+    if (settings.sound) FF.audio.playChime(settings.volume, settings.chime);
     if (FF.app) {
       FF.app.notify(finished);
       FF.app.toast(
@@ -366,7 +376,15 @@
     toggle,
     reset,
     setMode,
-    skip: () => setMode(nextModeAfter(t().mode)),
+    skip() {
+      const mode = t().mode;
+      if (mode !== "focus") {
+        setMode("focus");
+        return;
+      }
+      const interval = FF.store.state.settings.longBreakInterval || 4;
+      setMode((t().cycle + 1) % interval === 0 ? "long" : "short");
+    },
     hasWakeLock: () => !!wakeLock,
     TIPS,
   };
