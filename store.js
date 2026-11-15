@@ -20,11 +20,13 @@
       palette: "violet",
       dailyGoal: 8,
       weeklyGoal: 30,
+      displayName: "",
       focusMode: false,
       reminder: { enabled: false, time: "09:00" },
       chime: "bell",
     },
     tasks: [],
+    categories: [],
     activeTaskId: null,
     plan: { date: "", order: [] },
     previousPlan: { date: "", order: [] },
@@ -32,7 +34,8 @@
     rest: { week: "", credits: 1, days: [] },
     goalCelebratedOn: null,
     reminderSentOn: null,
-    timer: { mode: "focus", remaining: 25 * 60, running: false, endTime: null, cycle: 0, tip: "" },
+    levelSeen: 0,
+    timer: { mode: "focus", remaining: 25 * 60, running: false, endTime: null, cycle: 0, tip: "", owner: null, sessionId: null, beat: 0 },
     history: [],
   };
 
@@ -93,6 +96,7 @@
       state = deepMerge(clone(DEFAULTS), saved);
       state.settings = deepMerge(clone(DEFAULTS.settings), saved.settings || {});
       state.tasks = Array.isArray(saved.tasks) ? saved.tasks : [];
+      state.categories = Array.isArray(saved.categories) ? saved.categories : [];
       state.history = Array.isArray(saved.history) ? saved.history : [];
       if (!state.plan || !Array.isArray(state.plan.order)) state.plan = { date: "", order: [] };
       if (!state.previousPlan || !Array.isArray(state.previousPlan.order)) {
@@ -102,19 +106,30 @@
     if (!PALETTES.includes(state.settings.palette)) state.settings.palette = "violet";
     if (!CHIMES.includes(state.settings.chime)) state.settings.chime = "bell";
     state.settings.weeklyGoal = clamp(state.settings.weeklyGoal, 1, 80, 30);
+    state.settings.displayName = String(state.settings.displayName || "").trim().slice(0, 40);
+    if (!["none", "rain", "waves", "wind", "fire", "white", "brown"].includes(state.settings.ambient)) {
+      state.settings.ambient = "none";
+    }
+    state.categories = (state.categories || []).map(cleanCategory).filter(Boolean);
+    state.levelSeen = Math.max(0, Math.round(Number(state.levelSeen) || 0));
     rollPlan();
     reopenRepeating();
     if (!state.settings.reminder) state.settings.reminder = { enabled: false, time: "09:00" };
     settleRest();
-    // Çalışır durumdayken sayfa kapanmışsa: geçen süreyi düş.
     const t = state.timer;
+    t.needsComplete = false;
     if (t.running && t.endTime) {
-      t.remaining = Math.max(0, Math.round((t.endTime - Date.now()) / 1000));
+      const left = Math.round((t.endTime - Date.now()) / 1000);
+      if (left <= 0) {
+        t.remaining = 0;
+        t.needsComplete = true;
+      } else {
+        t.remaining = left;
+      }
+    } else if (!Number.isFinite(t.remaining) || t.remaining <= 0) {
+      t.remaining = modeSeconds(t.mode);
       t.running = false;
       t.endTime = null;
-    }
-    if (!Number.isFinite(t.remaining) || t.remaining <= 0) {
-      t.remaining = modeSeconds(t.mode);
     }
   }
 
@@ -182,6 +197,7 @@
       if (task.repeatDay === today) return;
       task.completed = false;
       task.donePomodoros = 0;
+      task.completedOn = null;
       task.repeatDay = today;
     });
   }
@@ -222,7 +238,28 @@
       createdAt: Number(task.createdAt) || Date.now(),
       repeat: task.repeat === "daily" ? "daily" : null,
       repeatDay: typeof task.repeatDay === "string" ? task.repeatDay : null,
+      description: typeof task.description === "string" ? task.description.trim().slice(0, 280) : "",
+      categoryId: typeof task.categoryId === "string" ? task.categoryId : null,
+      dueDate: /^\d{4}-\d{2}-\d{2}$/.test(task.dueDate) ? task.dueDate : null,
+      completedOn: /^\d{4}-\d{2}-\d{2}$/.test(task.completedOn) ? task.completedOn : null,
     };
+  }
+
+  function cleanCategory(item) {
+    if (!item || typeof item.name !== "string" || !item.name.trim()) return null;
+    return {
+      id: typeof item.id === "string" && item.id ? item.id : "c" + Date.now(),
+      name: item.name.trim().slice(0, 40),
+    };
+  }
+
+  function addCategory(name) {
+    const cleaned = cleanCategory({ id: "c" + Date.now(), name });
+    if (!cleaned) return null;
+    const existing = state.categories.find((item) => item.name.toLowerCase() === cleaned.name.toLowerCase());
+    if (existing) return existing.id;
+    state.categories.push(cleaned);
+    return cleaned.id;
   }
 
   function cleanSession(item) {
@@ -234,6 +271,7 @@
       minutes: clamp(item.minutes, 1, 180, 25),
       taskId: typeof item.taskId === "string" ? item.taskId : null,
       note: typeof item.note === "string" ? item.note.trim().slice(0, 140) : "",
+      sessionId: typeof item.sessionId === "string" ? item.sessionId : null,
     };
   }
 
@@ -245,6 +283,7 @@
       exportedAt: new Date().toISOString(),
       settings: state.settings,
       tasks: state.tasks,
+      categories: state.categories,
       activeTaskId: state.activeTaskId,
       plan: state.plan,
       previousPlan: state.previousPlan,
@@ -252,6 +291,7 @@
       goalCelebratedOn: state.goalCelebratedOn,
       reminderSentOn: state.reminderSentOn,
       rest: state.rest,
+      levelSeen: state.levelSeen,
       timer: { mode: timer.mode, remaining: timer.remaining, cycle: timer.cycle },
       history: state.history,
     };
@@ -267,6 +307,8 @@
     next.settings = deepMerge(clone(DEFAULTS.settings), data.settings);
     if (!PALETTES.includes(next.settings.palette)) next.settings.palette = "violet";
     next.tasks = Array.isArray(data.tasks) ? data.tasks.map(cleanTask).filter(Boolean) : [];
+    next.categories = Array.isArray(data.categories) ? data.categories.map(cleanCategory).filter(Boolean) : [];
+    next.levelSeen = Math.max(0, Math.round(Number(data.levelSeen) || 0));
     next.history = Array.isArray(data.history)
       ? data.history.map(cleanSession).filter(Boolean).slice(-HISTORY_CAP)
       : [];
@@ -390,6 +432,7 @@
     reopenRepeating,
     copyPreviousPlan,
     dismissYesterday,
+    addCategory,
     modeSeconds,
     todayKey,
     clone,

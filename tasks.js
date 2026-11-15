@@ -9,6 +9,10 @@
   let archiveOpen = false;
   let query = "";
   let editingId = null;
+  let filterStatus = "all";
+  let filterPriority = "all";
+  let filterCategory = "";
+  let filterDue = "all";
 
   function cache() {
     dom = {
@@ -17,6 +21,14 @@
       priority: document.getElementById("taskPriority"),
       target: document.getElementById("taskTarget"),
       repeat: document.getElementById("taskRepeat"),
+      desc: document.getElementById("taskDesc"),
+      due: document.getElementById("taskDue"),
+      category: document.getElementById("taskCategory"),
+      newCategory: document.getElementById("newCategory"),
+      filterStatus: document.getElementById("filterStatus"),
+      filterPriority: document.getElementById("filterPriority"),
+      filterCategory: document.getElementById("filterCategory"),
+      filterDue: document.getElementById("filterDue"),
       list: document.getElementById("taskList"),
       empty: document.getElementById("taskEmpty"),
       summary: document.getElementById("planSummary"),
@@ -54,14 +66,47 @@
       createdAt: Date.now(),
       repeat: dom.repeat.checked ? "daily" : null,
       repeatDay: dom.repeat.checked ? FF.store.todayKey() : null,
+      description: dom.desc.value.trim().slice(0, 280),
+      categoryId: categoryFromForm(),
+      dueDate: validDate(dom.due.value),
+      completedOn: null,
     };
+    dom.desc.value = "";
+    dom.due.value = "";
+    dom.newCategory.value = "";
     s.tasks.push(task);
     if (!s.activeTaskId) s.activeTaskId = task.id;
     dom.repeat.checked = false;
     FF.store.commit();
   }
 
-  function update(id, text, priority, target, repeat) {
+  function validDate(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+  }
+
+  function categoryFromForm() {
+    const named = dom.newCategory.value.trim();
+    if (named) return FF.store.addCategory(named);
+    return dom.category.value || null;
+  }
+
+  function fillCategories(select, selected, emptyLabel) {
+    const current = selected === undefined ? select.value : selected;
+    select.innerHTML = "";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = emptyLabel || (select === dom.category ? "Kategori yok" : "Tüm kategoriler");
+    select.appendChild(none);
+    FF.store.state.categories.forEach((cat) => {
+      const option = document.createElement("option");
+      option.value = cat.id;
+      option.textContent = cat.name;
+      select.appendChild(option);
+    });
+    if ([...select.options].some((option) => option.value === current)) select.value = current;
+  }
+
+  function update(id, text, priority, target, repeat, desc, due, categoryId) {
     const task = FF.store.state.tasks.find((item) => item.id === id);
     const trimmed = text.trim();
     if (!task || !trimmed) return;
@@ -75,6 +120,9 @@
       task.repeat = null;
       task.repeatDay = null;
     }
+    task.description = desc.trim().slice(0, 280);
+    task.categoryId = categoryId || null;
+    task.dueDate = validDate(due);
     editingId = null;
     FF.store.commit();
   }
@@ -83,6 +131,7 @@
     const task = FF.store.state.tasks.find((x) => x.id === id);
     if (!task) return;
     task.completed = !task.completed;
+    task.completedOn = task.completed ? FF.store.todayKey() : null;
     if (task.completed && task.repeat === "daily") task.repeatDay = FF.store.todayKey();
     const s = FF.store.state;
     if (task.completed && s.plan && s.plan.date === FF.store.todayKey()) {
@@ -192,7 +241,22 @@
   function render() {
     const s = FF.store.state;
     const openTasks = sorted();
-    const items = openTasks.filter((task) => !query || task.text.toLowerCase().includes(query));
+    fillCategories(dom.category);
+    fillCategories(dom.filterCategory, filterCategory);
+    const today = FF.store.todayKey();
+    const weekStart = FF.store.weekStart(today);
+    const weekEnd = FF.store.shiftDay(weekStart, 6);
+    const items = openTasks.filter((task) => {
+      if (query && !`${task.text} ${task.description || ""}`.toLowerCase().includes(query)) return false;
+      if (filterStatus === "open" && task.completed) return false;
+      if (filterStatus === "done" && !task.completed) return false;
+      if (filterPriority !== "all" && task.priority !== filterPriority) return false;
+      if (filterCategory && task.categoryId !== filterCategory) return false;
+      if (filterDue === "today" && task.dueDate !== today) return false;
+      if (filterDue === "week" && (!task.dueDate || task.dueDate < weekStart || task.dueDate > weekEnd)) return false;
+      if (filterDue === "overdue" && (!task.dueDate || task.dueDate >= today || task.completed)) return false;
+      return true;
+    });
     const archived = FF.store.state.tasks.filter((task) => task.archived);
     const completedCount = openTasks.filter((task) => task.completed).length;
     const hasTasks = FF.store.state.tasks.some((task) => !task.archived);
@@ -259,7 +323,26 @@
         repeat.textContent = "Her gün";
         meta.appendChild(repeat);
       }
+      const category = FF.store.state.categories.find((item) => item.id === task.categoryId);
+      if (category) {
+        const cat = document.createElement("span");
+        cat.className = "task-cat";
+        cat.textContent = category.name;
+        meta.appendChild(cat);
+      }
+      if (task.dueDate) {
+        const due = document.createElement("span");
+        due.className = "task-due" + (!task.completed && task.dueDate < FF.store.todayKey() ? " overdue" : "");
+        due.textContent = task.dueDate;
+        meta.appendChild(due);
+      }
       main.append(title, meta);
+      if (task.description) {
+        const desc = document.createElement("p");
+        desc.className = "task-desc";
+        desc.textContent = task.description;
+        main.appendChild(desc);
+      }
 
       const actions = document.createElement("div");
       actions.className = "task-actions";
@@ -393,6 +476,24 @@
     target.value = String(task.targetPomodoros);
     target.setAttribute("aria-label", "Hedef pomodoro");
 
+    const desc = document.createElement("textarea");
+    desc.className = "input edit-desc";
+    desc.maxLength = 280;
+    desc.rows = 2;
+    desc.value = task.description || "";
+    desc.setAttribute("aria-label", "Açıklama");
+
+    const due = document.createElement("input");
+    due.className = "input";
+    due.type = "date";
+    due.value = task.dueDate || "";
+    due.setAttribute("aria-label", "Son teslim tarihi");
+
+    const category = document.createElement("select");
+    category.className = "input";
+    category.setAttribute("aria-label", "Kategori");
+    fillCategories(category, task.categoryId || "", "Kategori yok");
+
     const repeatLabel = document.createElement("label");
     repeatLabel.className = "repeat-opt";
     const repeat = document.createElement("input");
@@ -418,10 +519,10 @@
     });
     actions.append(save, cancel, repeatLabel);
 
-    form.append(name, priority, target, actions);
+    form.append(name, desc, priority, target, due, category, actions);
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      update(task.id, name.value, priority.value, target.value, repeat.checked);
+      update(task.id, name.value, priority.value, target.value, repeat.checked, desc.value, due.value, category.value);
     });
     return form;
   }
@@ -437,6 +538,22 @@
     });
     dom.search.addEventListener("input", () => {
       query = dom.search.value.trim().toLowerCase();
+      render();
+    });
+    dom.filterStatus.addEventListener("change", () => {
+      filterStatus = dom.filterStatus.value;
+      render();
+    });
+    dom.filterPriority.addEventListener("change", () => {
+      filterPriority = dom.filterPriority.value;
+      render();
+    });
+    dom.filterCategory.addEventListener("change", () => {
+      filterCategory = dom.filterCategory.value;
+      render();
+    });
+    dom.filterDue.addEventListener("change", () => {
+      filterDue = dom.filterDue.value;
       render();
     });
     dom.copyPlan.addEventListener("click", () => {

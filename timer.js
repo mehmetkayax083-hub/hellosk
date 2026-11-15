@@ -28,6 +28,25 @@
   let breathStep = 0;
   let wakeLock = null;
   let dom = {};
+  let lastBeatSave = 0;
+  let completing = false;
+
+  const tabId = (() => {
+    const key = "focusflow.tab";
+    let id = sessionStorage.getItem(key);
+    if (!id) {
+      id = "tab" + Date.now() + Math.floor(Math.random() * 1000);
+      sessionStorage.setItem(key, id);
+    }
+    return id;
+  })();
+
+  let channel = null;
+  try {
+    channel = new BroadcastChannel("focusflow-timer");
+  } catch {
+    channel = null;
+  }
 
   function cache() {
     dom = {
@@ -86,7 +105,26 @@
     renderPlan();
     renderEta();
     renderGoal();
+    renderFocusLengths();
     syncBreath();
+  }
+
+  function renderFocusLengths() {
+    const focus = FF.store.state.settings.durations.focus;
+    document.querySelectorAll("[data-focus]").forEach((btn) => {
+      btn.classList.toggle("active", Number(btn.dataset.focus) === focus);
+    });
+  }
+
+  function setFocusLength(minutes) {
+    if (t().running) {
+      if (FF.app) FF.app.toast("Süre için önce sayacı durdur.");
+      return;
+    }
+    if (![25, 45, 50, 60].includes(minutes)) return;
+    FF.store.state.settings.durations.focus = minutes;
+    if (t().mode === "focus") t().remaining = minutes * 60;
+    FF.store.commit();
   }
 
   function renderGoal() {
@@ -230,11 +268,85 @@
     }
   }
 
+  function ownerIsStale() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("focusflow.v1"));
+      const beat = raw && raw.timer && raw.timer.beat;
+      return !raw || !raw.timer || raw.timer.owner === tabId || !beat || Date.now() - beat > 5000;
+    } catch {
+      return true;
+    }
+  }
+
+  function publish() {
+    if (channel) channel.postMessage({ type: "state", from: tabId });
+  }
+
+  function applyRemote() {
+    let incoming = null;
+    try {
+      incoming = JSON.parse(localStorage.getItem("focusflow.v1"));
+    } catch {
+      return;
+    }
+    if (!incoming || !incoming.timer || incoming.timer.owner === tabId) return;
+    const timer = FF.store.state.timer;
+    ["running", "endTime", "remaining", "mode", "cycle", "owner", "sessionId", "beat", "tip"].forEach((key) => {
+      timer[key] = incoming.timer[key];
+    });
+    if (Array.isArray(incoming.history) && incoming.history.length !== FF.store.state.history.length) {
+      FF.store.state.history = incoming.history;
+      if (Array.isArray(incoming.tasks)) FF.store.state.tasks = incoming.tasks;
+      FF.bus.emit("change");
+    }
+    ensureInterval();
+    render();
+  }
+
   function tick() {
     const timer = t();
+    if (timer.owner !== tabId) {
+      followClock();
+      return;
+    }
+    timer.remaining = Math.max(0, Math.round((timer.endTime - Date.now()) / 1000));
+    timer.beat = Date.now();
+    paint();
+    if (Date.now() - lastBeatSave > 2000) {
+      lastBeatSave = Date.now();
+      FF.store.save();
+    }
+    if (timer.remaining <= 0) complete();
+  }
+
+  function followClock() {
+    const timer = t();
+    if (!timer.running || !timer.endTime) return;
     timer.remaining = Math.max(0, Math.round((timer.endTime - Date.now()) / 1000));
     paint();
-    if (timer.remaining <= 0) complete();
+    if (timer.remaining <= 0 && ownerIsStale()) {
+      timer.owner = tabId;
+      complete();
+    }
+  }
+
+  function ensureInterval() {
+    clearInterval(intervalId);
+    intervalId = null;
+    const timer = t();
+    if (timer.needsComplete) {
+      timer.needsComplete = false;
+      if (!timer.owner || timer.owner === tabId || ownerIsStale()) {
+        timer.owner = tabId;
+        complete();
+      }
+      return;
+    }
+    if (timer.running && timer.endTime && timer.endTime > Date.now()) {
+      if (!timer.owner || timer.owner === tabId || ownerIsStale()) timer.owner = tabId;
+      intervalId = setInterval(timer.owner === tabId ? tick : followClock, 250);
+      if (timer.owner === tabId) acquireWake();
+    }
   }
 
   /* Sadece sayaç yüzeyini günceller (her saniye tam render maliyetli olmasın). */
@@ -260,18 +372,39 @@
     releaseWake();
   }
 
+  function foreignRunning() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("focusflow.v1"));
+      const timer = raw && raw.timer;
+      if (!timer || !timer.running || !(timer.endTime > Date.now())) return false;
+      if (!timer.owner || timer.owner === tabId) return false;
+      return Date.now() - (timer.beat || 0) <= 5000;
+    } catch {
+      return false;
+    }
+  }
+
   function start() {
     const timer = t();
+    if (foreignRunning()) {
+      applyRemote();
+      if (FF.app) FF.app.toast("Sayaç başka bir sekmede çalışıyor.");
+      return;
+    }
     if (timer.running || timer.remaining <= 0) return;
     FF.audio.unlock();
     if (FF.app) FF.app.requestNotifications();
+    timer.owner = tabId;
+    timer.sessionId = "s" + Date.now();
     timer.running = true;
+    timer.beat = Date.now();
     timer.endTime = Date.now() + timer.remaining * 1000;
     clearInterval(intervalId);
     intervalId = setInterval(tick, 250);
     acquireWake();
     render();
     FF.store.save();
+    publish();
   }
 
   function pause() {
@@ -279,6 +412,7 @@
     if (timer.running && timer.endTime) {
       timer.remaining = Math.max(0, Math.round((timer.endTime - Date.now()) / 1000));
     }
+    timer.owner = tabId;
     timer.running = false;
     timer.endTime = null;
     clearInterval(intervalId);
@@ -286,6 +420,7 @@
     releaseWake();
     render();
     FF.store.save();
+    publish();
   }
 
   function toggle() {
@@ -300,8 +435,10 @@
     intervalId = null;
     releaseWake();
     timer.remaining = FF.store.modeSeconds(timer.mode);
+    timer.sessionId = null;
     render();
     FF.store.save();
+    publish();
   }
 
   function setMode(mode) {
@@ -314,8 +451,10 @@
     timer.tip = pickTip(mode);
     timer.remaining = FF.store.modeSeconds(mode);
     releaseWake();
+    timer.sessionId = null;
     render();
     FF.store.save();
+    publish();
   }
 
   function nextModeAfter(mode) {
@@ -328,6 +467,18 @@
 
   function complete() {
     const timer = t();
+    if (completing) return;
+    if (timer.sessionId && FF.store.state.history.some((item) => item.sessionId === timer.sessionId)) {
+      timer.running = false;
+      timer.endTime = null;
+      timer.needsComplete = false;
+      clearInterval(intervalId);
+      intervalId = null;
+      releaseWake();
+      render();
+      return;
+    }
+    completing = true;
     const finished = timer.mode;
     clearInterval(intervalId);
     intervalId = null;
@@ -366,6 +517,8 @@
     FF.store.commit();
 
     if (finished === "focus" && FF.app && FF.app.afterFocusComplete) FF.app.afterFocusComplete();
+    publish();
+    completing = false;
     if (shouldAuto) start();
   }
 
@@ -403,6 +556,7 @@
       minutes: s.settings.durations.focus,
       taskId: s.activeTaskId,
       note: "",
+      sessionId: s.timer.sessionId || null,
     });
     if (FF.store.clearRestToday) FF.store.clearRestToday();
     if (s.history.length > FF.store.HISTORY_CAP) s.history = s.history.slice(-FF.store.HISTORY_CAP);
@@ -432,9 +586,19 @@
   function init() {
     cache();
     render();
+    ensureInterval();
     FF.bus.on("change", render);
+    document.querySelectorAll("[data-focus]").forEach((btn) => {
+      btn.addEventListener("click", () => setFocusLength(Number(btn.dataset.focus)));
+    });
+    if (channel) {
+      channel.onmessage = (event) => {
+        if (!event.data || event.data.from === tabId) return;
+        applyRemote();
+      };
+    }
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && running()) acquireWake();
+      if (document.visibilityState === "visible" && running() && t().owner === tabId) acquireWake();
     });
   }
 

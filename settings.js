@@ -26,6 +26,7 @@
       ambientVol: document.getElementById("setAmbientVol"),
       theme: document.getElementById("setTheme"),
       focusMode: document.getElementById("setFocusMode"),
+      name: document.getElementById("setName"),
       swatches: document.querySelectorAll(".swatch"),
       exportBtn: document.getElementById("exportBtn"),
       importFile: document.getElementById("importFile"),
@@ -62,6 +63,7 @@
     dom.ambientVol.value = s.ambientVolume;
     dom.theme.checked = s.theme === "dark";
     dom.focusMode.checked = s.focusMode;
+    dom.name.value = s.displayName || "";
     dom.swatches.forEach((btn) => {
       const on = btn.dataset.palette === s.palette;
       btn.classList.toggle("active", on);
@@ -179,6 +181,12 @@
     });
     dom.exportBtn.addEventListener("click", downloadBackup);
     dom.importFile.addEventListener("change", importBackup);
+    dom.name.addEventListener("change", () => {
+      s().displayName = dom.name.value.trim().slice(0, 40);
+      dom.name.value = s().displayName;
+      FF.store.commit();
+    });
+
     dom.focusMode.addEventListener("change", () => {
       FF.app.setFocusMode(dom.focusMode.checked);
     });

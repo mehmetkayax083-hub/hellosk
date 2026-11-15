@@ -50,6 +50,10 @@
     });
     if (view === "stats") FF.stats.render();
     if (view === "tasks") FF.tasks.render();
+    if (view === "home" && FF.home) FF.home.render();
+    if (view === "calendar" && FF.calendar) FF.calendar.render();
+    if (view === "achievements" && FF.achievements) FF.achievements.render();
+    if (view === "sounds" && FF.sounds) FF.sounds.render();
   }
 
   function applyTheme() {
@@ -348,9 +352,13 @@
     FF.tasks.init();
     FF.stats.init();
     FF.settings.init();
+    FF.home.init();
+    FF.calendar.init();
+    FF.achievements.init();
+    FF.sounds.init();
 
     bind();
-    navigate("timer");
+    navigate("home");
   }
 
   if (document.readyState === "loading") {

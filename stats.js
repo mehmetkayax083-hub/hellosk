@@ -22,6 +22,8 @@
       weekGoal: document.getElementById("weekGoal"),
       taskBreakdown: document.getElementById("taskBreakdown"),
       taskBreakdownEmpty: document.getElementById("taskBreakdownEmpty"),
+      catBreakdown: document.getElementById("catBreakdown"),
+      catBreakdownEmpty: document.getElementById("catBreakdownEmpty"),
       monthMin: document.getElementById("monthMin"),
       monthPomo: document.getElementById("monthPomo"),
       monthDays: document.getElementById("monthDays"),
@@ -177,6 +179,7 @@
     const weekMin = week.reduce((a, d) => a + d.mins, 0);
     dom.weekTotal.textContent = `${weekMin} dk · ${Math.round(weekMin / 60 * 10) / 10} sa`;
     renderWeekTasks(history, today);
+    renderCategories(history);
     renderHeatmap(history, today);
 
     // Bu ay
@@ -263,6 +266,28 @@
           `</li>`
         );
       })
+      .join("");
+  }
+
+  function renderCategories(history) {
+    const buckets = new Map();
+    history.forEach((item) => {
+      const task = FF.store.state.tasks.find((entry) => entry.id === item.taskId);
+      if (!task || !task.categoryId) return;
+      const category = FF.store.state.categories.find((entry) => entry.id === task.categoryId);
+      if (!category) return;
+      const row = buckets.get(category.id) || { name: category.name, count: 0, minutes: 0 };
+      row.count += 1;
+      row.minutes += item.minutes;
+      buckets.set(category.id, row);
+    });
+    const rows = Array.from(buckets.values()).sort((a, b) => b.minutes - a.minutes);
+    dom.catBreakdownEmpty.hidden = rows.length > 0;
+    dom.catBreakdown.innerHTML = rows
+      .map(
+        (row) =>
+          `<li class="breakdown-item"><span class="breakdown-name">${escapeHtml(row.name)}</span><span class="breakdown-meta">${row.count} pomodoro · ${row.minutes} dk</span></li>`
+      )
       .join("");
   }
 
@@ -370,5 +395,11 @@
     FF.bus.on("change", render);
   }
 
-  FF.stats = { init, render, currentStreak, closeDay };
+  FF.stats = {
+    init,
+    render,
+    currentStreak,
+    closeDay,
+    longestStreak: () => longestStreak(coveredDays()),
+  };
 })();

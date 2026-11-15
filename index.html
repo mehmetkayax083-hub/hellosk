@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
-<body data-view="timer" data-mode="focus" data-theme="dark" data-palette="violet">
+<body data-view="home" data-mode="focus" data-theme="dark" data-palette="violet">
   <div class="app">
     <!-- Yan menü (masaüstü) / üst kimlik -->
     <aside class="sidebar">
@@ -23,17 +23,33 @@
       </div>
 
       <nav class="nav" aria-label="Ana gezinme">
-        <button class="nav-item active" data-nav="timer" aria-current="page">
+        <button class="nav-item active" data-nav="home" aria-current="page">
+          <span class="nav-ico i-home" aria-hidden="true"></span>
+          <span class="nav-label">Ana Sayfa</span>
+        </button>
+        <button class="nav-item" data-nav="timer">
           <span class="nav-ico i-timer" aria-hidden="true"></span>
-          <span class="nav-label">Zamanlayıcı</span>
+          <span class="nav-label">Pomodoro</span>
         </button>
         <button class="nav-item" data-nav="tasks">
           <span class="nav-ico i-tasks" aria-hidden="true"></span>
           <span class="nav-label">Görevler</span>
         </button>
+        <button class="nav-item" data-nav="calendar">
+          <span class="nav-ico i-cal" aria-hidden="true"></span>
+          <span class="nav-label">Takvim</span>
+        </button>
         <button class="nav-item" data-nav="stats">
           <span class="nav-ico i-stats" aria-hidden="true"></span>
           <span class="nav-label">İstatistik</span>
+        </button>
+        <button class="nav-item" data-nav="achievements">
+          <span class="nav-ico i-badge" aria-hidden="true"></span>
+          <span class="nav-label">Başarılar</span>
+        </button>
+        <button class="nav-item" data-nav="sounds">
+          <span class="nav-ico i-sound" aria-hidden="true"></span>
+          <span class="nav-label">Odak Sesleri</span>
         </button>
         <button class="nav-item" data-nav="settings">
           <span class="nav-ico i-settings" aria-hidden="true"></span>
@@ -48,8 +64,61 @@
     </aside>
 
     <main class="content">
-      <!-- ZAMANLAYICI -->
-      <section class="view view-timer" data-view-panel="timer">
+      <!-- ANA SAYFA -->
+      <section class="view view-home" data-view-panel="home">
+        <header class="view-head">
+          <h1 id="homeGreeting">İyi günler</h1>
+          <p class="view-sub" id="homeDate"></p>
+        </header>
+        <div class="stat-grid">
+          <div class="stat-card"><span class="stat-label">Bugün odak</span><span class="stat-value"><strong id="homeMin">0</strong> dk</span></div>
+          <div class="stat-card"><span class="stat-label">Pomodoro</span><span class="stat-value"><strong id="homePomo">0</strong></span></div>
+          <div class="stat-card"><span class="stat-label">Tamamlanan görev</span><span class="stat-value"><strong id="homeDone">0</strong></span></div>
+          <div class="stat-card"><span class="stat-label">Seri</span><span class="stat-value"><strong id="homeStreak">0</strong> gün</span></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Günlük hedef</h2><span class="panel-note" id="homeGoalText">0/8</span></div>
+          <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="homeGoalBar"></div></div>
+        </div>
+        <div class="launch-card">
+          <div>
+            <h2>Pomodoro</h2>
+            <p id="homeTimerStatus">25:00 hazır</p>
+          </div>
+          <button class="btn btn-primary" id="goTimer" type="button">Sayacı aç</button>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Hızlı görev</h2></div>
+          <form id="homeTaskForm" class="quick-add" autocomplete="off">
+            <input class="input" id="homeTaskInput" maxlength="100" placeholder="Bugün yapılacak bir iş…" aria-label="Hızlı görev">
+            <button class="btn btn-primary" type="submit">Ekle</button>
+          </form>
+        </div>
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-head"><h2>Bugün</h2></div>
+            <ul class="home-list" id="homeToday"></ul>
+            <p class="empty" id="homeTodayEmpty">Bugünün planı boş.</p>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Yaklaşan</h2></div>
+            <ul class="home-list" id="homeUpcoming"></ul>
+            <p class="empty" id="homeUpcomingEmpty">Teslim tarihi olan görev yok.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Bu hafta</h2><span class="panel-note" id="homeWeek"></span></div>
+          <p class="panel-copy" id="homeNote"></p>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Son çalışmalar</h2></div>
+          <ul class="home-list" id="homeRecent"></ul>
+          <p class="empty" id="homeRecentEmpty">Henüz oturum yok.</p>
+        </div>
+      </section>
+
+      <!-- POMODORO -->
+      <section class="view view-timer" data-view-panel="timer" hidden>
         <p class="motivation" id="motivation"></p>
         <div class="yesterday" id="yesterday" hidden>
           <p id="yesterdayText"></p>
@@ -60,6 +129,12 @@
           <button class="mode-btn active" role="tab" aria-selected="true" data-mode="focus">Odaklanma</button>
           <button class="mode-btn" role="tab" aria-selected="false" data-mode="short">Kısa Mola</button>
           <button class="mode-btn" role="tab" aria-selected="false" data-mode="long">Uzun Mola</button>
+        </div>
+        <div class="focus-lengths" role="group" aria-label="Odak süresi">
+          <button type="button" data-focus="25">25</button>
+          <button type="button" data-focus="45">45</button>
+          <button type="button" data-focus="50">50</button>
+          <button type="button" data-focus="60">60</button>
         </div>
 
         <div class="dial">
@@ -132,7 +207,31 @@
             <input type="checkbox" id="taskRepeat">
             Her gün tekrarla
           </label>
+          <input class="input task-desc-input" id="taskDesc" maxlength="280" placeholder="Açıklama (isteğe bağlı)" aria-label="Açıklama">
+          <input class="input" id="taskDue" type="date" aria-label="Son teslim tarihi">
+          <select class="input" id="taskCategory" aria-label="Kategori"></select>
+          <input class="input" id="newCategory" maxlength="40" placeholder="Yeni kategori" aria-label="Yeni kategori">
         </form>
+        <div class="task-filters">
+          <select class="input" id="filterStatus" aria-label="Durum">
+            <option value="all">Tümü</option>
+            <option value="open">Açık</option>
+            <option value="done">Tamamlanan</option>
+          </select>
+          <select class="input" id="filterPriority" aria-label="Öncelik süzgeci">
+            <option value="all">Tüm öncelikler</option>
+            <option value="high">Yüksek</option>
+            <option value="medium">Orta</option>
+            <option value="low">Düşük</option>
+          </select>
+          <select class="input" id="filterCategory" aria-label="Kategori süzgeci"></select>
+          <select class="input" id="filterDue" aria-label="Teslim süzgeci">
+            <option value="all">Tüm tarihler</option>
+            <option value="today">Bugün teslim</option>
+            <option value="week">Bu hafta</option>
+            <option value="overdue">Geciken</option>
+          </select>
+        </div>
         <div class="plan-tools">
           <p class="plan-summary" id="planSummary" hidden></p>
           <button class="link-btn" id="copyPlanBtn" type="button" hidden>Dünün planını getir</button>
@@ -195,6 +294,12 @@
           </div>
           <ul class="task-breakdown" id="taskBreakdown"></ul>
           <p class="empty" id="taskBreakdownEmpty" hidden>Bu hafta henüz görev kaydı yok.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Kategorilere göre</h2></div>
+          <ul class="task-breakdown" id="catBreakdown"></ul>
+          <p class="empty" id="catBreakdownEmpty" hidden>Kategorili oturum yok.</p>
         </div>
 
         <div class="panel">
@@ -268,6 +373,60 @@
           <ul class="history-list" id="historyList"></ul>
           <p class="empty" id="historyEmpty" hidden>Henüz tamamlanmış oturum yok.</p>
         </div>
+      </section>
+
+      <!-- TAKVİM -->
+      <section class="view view-calendar" data-view-panel="calendar" hidden>
+        <header class="view-head">
+          <h1>Çalışma takvimi</h1>
+          <p class="view-sub">Oturumlar ve teslim tarihleri</p>
+        </header>
+        <div class="cal-toolbar">
+          <button class="btn btn-line" id="calPrev" type="button" aria-label="Önceki">‹</button>
+          <strong id="calTitle"></strong>
+          <button class="btn btn-line" id="calNext" type="button" aria-label="Sonraki">›</button>
+          <div class="cal-modes" role="tablist" aria-label="Takvim görünümü">
+            <button type="button" data-cal="month" class="active">Ay</button>
+            <button type="button" data-cal="week">Hafta</button>
+            <button type="button" data-cal="day">Gün</button>
+          </div>
+        </div>
+        <div id="calBody"></div>
+        <div class="panel" id="calDetail" hidden>
+          <div class="panel-head"><h2 id="calDetailTitle">Gün</h2></div>
+          <p class="panel-copy" id="calDetailStats"></p>
+          <ul class="home-list" id="calTasks"></ul>
+          <ul class="history-list" id="calSessions"></ul>
+        </div>
+      </section>
+
+      <!-- BAŞARILAR -->
+      <section class="view view-achievements" data-view-panel="achievements" hidden>
+        <header class="view-head">
+          <h1>Başarılar</h1>
+          <p class="view-sub">Seviye ve rozetler tamamlanan oturumlardan hesaplanır</p>
+        </header>
+        <div class="panel">
+          <div class="panel-head"><h2 id="levelTitle">Seviye 1</h2><span class="panel-note" id="levelXp">0 XP</span></div>
+          <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="levelBar"></div></div>
+          <p class="panel-copy" id="levelHint"></p>
+        </div>
+        <div class="badge-grid" id="badgeGrid"></div>
+      </section>
+
+      <!-- SESLER -->
+      <section class="view view-sounds" data-view-panel="sounds" hidden>
+        <header class="view-head">
+          <h1>Odak sesleri</h1>
+          <p class="view-sub">Yağmur, dalga, rüzgar, şömine ve gürültü tarayıcıda üretilir. Seçilen ses sürekli döngüde çalar ve sayaç çalışırken de sürer.</p>
+        </header>
+        <div class="panel">
+          <div class="field-row">
+            <label for="soundVol">Ses seviyesi</label>
+            <input id="soundVol" type="range" min="0" max="1" step="0.05" class="range">
+          </div>
+        </div>
+        <div class="sound-grid" id="soundGrid"></div>
       </section>
 
       <!-- AYARLAR -->
@@ -359,6 +518,8 @@
               <option value="none">Kapalı</option>
               <option value="rain">Yağmur</option>
               <option value="waves">Dalga</option>
+              <option value="wind">Rüzgar</option>
+              <option value="fire">Şömine</option>
               <option value="white">Beyaz gürültü</option>
               <option value="brown">Kahverengi gürültü</option>
             </select>
@@ -371,6 +532,10 @@
 
         <div class="panel">
           <div class="panel-head"><h2>Görünüm</h2></div>
+          <div class="field-row">
+            <label for="setName">Görünen ad</label>
+            <input class="input" id="setName" maxlength="40" placeholder="İsteğe bağlı" autocomplete="nickname">
+          </div>
           <div class="field-row toggle">
             <label for="setTheme">Koyu tema</label>
             <input id="setTheme" type="checkbox" class="switch">
@@ -420,10 +585,14 @@
 
     <!-- Alt gezinme (mobil) -->
     <nav class="tabbar" aria-label="Mobil gezinme">
-      <button class="tab active" data-nav="timer"><span class="nav-ico i-timer"></span><span>Zamanlayıcı</span></button>
-      <button class="tab" data-nav="tasks"><span class="nav-ico i-tasks"></span><span>Görevler</span></button>
-      <button class="tab" data-nav="stats"><span class="nav-ico i-stats"></span><span>İstatistik</span></button>
-      <button class="tab" data-nav="settings"><span class="nav-ico i-settings"></span><span>Ayarlar</span></button>
+      <button class="tab active" data-nav="home"><span class="nav-ico i-home"></span><span>Ana</span></button>
+      <button class="tab" data-nav="timer"><span class="nav-ico i-timer"></span><span>Sayaç</span></button>
+      <button class="tab" data-nav="tasks"><span class="nav-ico i-tasks"></span><span>Görev</span></button>
+      <button class="tab" data-nav="calendar"><span class="nav-ico i-cal"></span><span>Takvim</span></button>
+      <button class="tab" data-nav="stats"><span class="nav-ico i-stats"></span><span>Veri</span></button>
+      <button class="tab" data-nav="achievements"><span class="nav-ico i-badge"></span><span>Rozet</span></button>
+      <button class="tab" data-nav="sounds"><span class="nav-ico i-sound"></span><span>Ses</span></button>
+      <button class="tab" data-nav="settings"><span class="nav-ico i-settings"></span><span>Ayar</span></button>
     </nav>
   </div>
 
@@ -460,6 +629,10 @@
   <script src="tasks.js"></script>
   <script src="stats.js"></script>
   <script src="settings.js"></script>
+  <script src="home.js"></script>
+  <script src="calendar.js"></script>
+  <script src="achievements.js"></script>
+  <script src="sounds.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

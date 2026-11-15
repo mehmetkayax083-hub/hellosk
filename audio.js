@@ -3,6 +3,14 @@
   "use strict";
 
   const FF = (window.FF = window.FF || {});
+  const AMBIENTS = [
+    { id: "rain", label: "Yağmur" },
+    { id: "waves", label: "Deniz dalgası" },
+    { id: "wind", label: "Rüzgar" },
+    { id: "fire", label: "Şömine" },
+    { id: "white", label: "Beyaz gürültü" },
+    { id: "brown", label: "Kahverengi gürültü" },
+  ];
   let ctx = null;
   let ambientNodes = null;
   let currentAmbient = "none";
@@ -76,7 +84,7 @@
     if (!ac) return;
 
     const src = ac.createBufferSource();
-    src.buffer = noiseBuffer(ac, kind === "brown" ? "brown" : "white");
+    src.buffer = noiseBuffer(ac, kind === "brown" || kind === "fire" ? "brown" : "white");
     src.loop = true;
 
     const filter = ac.createBiquadFilter();
@@ -92,25 +100,60 @@
     } else if (kind === "waves") {
       filter.type = "lowpass";
       filter.frequency.value = 600;
-      // Yavaş dalgalanma için ses seviyesini LFO ile modüle et.
       lfo = ac.createOscillator();
       lfoGain = ac.createGain();
       lfo.frequency.value = 0.12;
       lfoGain.gain.value = gain.gain.value * 0.6;
       lfo.connect(lfoGain).connect(gain.gain);
       lfo.start();
+    } else if (kind === "wind") {
+      filter.type = "lowpass";
+      filter.frequency.value = 700;
+      lfo = ac.createOscillator();
+      lfoGain = ac.createGain();
+      lfo.frequency.value = 0.18;
+      lfoGain.gain.value = 280;
+      lfo.connect(lfoGain).connect(filter.frequency);
+      lfo.start();
+    } else if (kind === "fire") {
+      filter.type = "lowpass";
+      filter.frequency.value = 420;
+      gain.gain.value = (typeof volume === "number" ? volume : 0.4) * 0.22;
     } else if (kind === "white") {
       filter.type = "bandpass";
       filter.frequency.value = 1800;
       filter.Q.value = 0.4;
-    } else {
+    } else if (kind === "brown") {
       filter.type = "lowpass";
       filter.frequency.value = 900;
+    } else {
+      currentAmbient = "none";
+      return;
     }
 
     src.connect(filter).connect(gain).connect(ac.destination);
     src.start();
-    ambientNodes = { src, gain, lfo, lfoGain };
+    let crackle = null;
+    if (kind === "fire") {
+      const level = typeof volume === "number" ? volume : 0.4;
+      crackle = setInterval(() => {
+        if (!ambientNodes || currentAmbient !== "fire") return;
+        const burst = ac.createBufferSource();
+        burst.buffer = noiseBuffer(ac, "white");
+        const burstFilter = ac.createBiquadFilter();
+        burstFilter.type = "highpass";
+        burstFilter.frequency.value = 1800;
+        const burstGain = ac.createGain();
+        const now = ac.currentTime;
+        burstGain.gain.setValueAtTime(0.0001, now);
+        burstGain.gain.exponentialRampToValueAtTime(Math.max(0.02, level * 0.35), now + 0.01);
+        burstGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+        burst.connect(burstFilter).connect(burstGain).connect(ac.destination);
+        burst.start(now);
+        burst.stop(now + 0.1);
+      }, 900);
+    }
+    ambientNodes = { src, gain, lfo, lfoGain, crackle };
   }
 
   function stopAmbient() {
@@ -118,6 +161,7 @@
       try {
         ambientNodes.src.stop();
         if (ambientNodes.lfo) ambientNodes.lfo.stop();
+        if (ambientNodes.crackle) clearInterval(ambientNodes.crackle);
       } catch {
         /* zaten durmuş olabilir */
       }
@@ -131,6 +175,7 @@
   }
 
   FF.audio = {
+    AMBIENTS,
     unlock,
     playChime,
     startAmbient,
