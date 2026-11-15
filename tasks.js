@@ -6,6 +6,7 @@
   const PRIO = { high: { label: "Yüksek", weight: 0 }, medium: { label: "Orta", weight: 1 }, low: { label: "Düşük", weight: 2 } };
 
   let dom = {};
+  let archiveOpen = false;
 
   function cache() {
     dom = {
@@ -16,11 +17,15 @@
       list: document.getElementById("taskList"),
       empty: document.getElementById("taskEmpty"),
       summary: document.getElementById("planSummary"),
+      archiveBar: document.getElementById("archiveBar"),
+      archiveDone: document.getElementById("archiveDoneBtn"),
+      toggleArchive: document.getElementById("toggleArchiveBtn"),
+      archiveList: document.getElementById("archiveList"),
     };
   }
 
   function sorted() {
-    return FF.store.state.tasks.slice().sort((a, b) => {
+    return FF.store.state.tasks.filter((task) => !task.archived).slice().sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       const pa = PRIO[a.priority] ? PRIO[a.priority].weight : 1;
       const pb = PRIO[b.priority] ? PRIO[b.priority].weight : 1;
@@ -40,6 +45,7 @@
       targetPomodoros: Math.min(Math.max(parseInt(target, 10) || 1, 1), 20),
       donePomodoros: 0,
       completed: false,
+      archived: false,
       createdAt: Date.now(),
     };
     s.tasks.push(task);
@@ -58,8 +64,8 @@
     if (task.completed && s.activeTaskId === id) {
       const nextPlanned = (s.plan && s.plan.order) || [];
       const nextActive =
-        s.tasks.find((item) => nextPlanned.includes(item.id) && !item.completed) ||
-        s.tasks.find((item) => !item.completed);
+        s.tasks.find((item) => nextPlanned.includes(item.id) && !item.completed && !item.archived) ||
+        s.tasks.find((item) => !item.completed && !item.archived);
       s.activeTaskId = nextActive ? nextActive.id : null;
     }
     FF.store.commit();
@@ -70,7 +76,7 @@
     s.tasks = s.tasks.filter((x) => x.id !== id);
     if (s.plan) s.plan.order = s.plan.order.filter((item) => item !== id);
     if (s.activeTaskId === id) {
-      const nextActive = s.tasks.find((x) => !x.completed);
+      const nextActive = s.tasks.find((x) => !x.completed && !x.archived);
       s.activeTaskId = nextActive ? nextActive.id : null;
     }
     FF.store.commit();
@@ -95,6 +101,39 @@
     FF.store.commit();
   }
 
+  function movePlan(id, direction) {
+    const plan = FF.store.state.plan;
+    if (!plan) return;
+    const index = plan.order.indexOf(id);
+    const next = index + direction;
+    if (index < 0 || next < 0 || next >= plan.order.length) return;
+    const swapped = plan.order[index];
+    plan.order[index] = plan.order[next];
+    plan.order[next] = swapped;
+    FF.store.commit();
+  }
+
+  function archiveCompleted() {
+    const state = FF.store.state;
+    state.tasks.forEach((task) => {
+      if (task.completed) task.archived = true;
+    });
+    if (state.plan) {
+      state.plan.order = state.plan.order.filter((id) => {
+        const task = state.tasks.find((item) => item.id === id);
+        return task && !task.archived && !task.completed;
+      });
+    }
+    FF.store.commit();
+  }
+
+  function restore(id) {
+    const task = FF.store.state.tasks.find((item) => item.id === id);
+    if (!task) return;
+    task.archived = false;
+    FF.store.commit();
+  }
+
   function setActive(id) {
     const task = FF.store.state.tasks.find((x) => x.id === id);
     if (!task || task.completed) return;
@@ -105,7 +144,14 @@
   function render() {
     const s = FF.store.state;
     const items = sorted();
+    const archived = FF.store.state.tasks.filter((task) => task.archived);
+    const completedCount = items.filter((task) => task.completed).length;
     dom.empty.hidden = items.length > 0;
+    dom.archiveBar.hidden = completedCount === 0 && archived.length === 0;
+    dom.archiveDone.hidden = completedCount === 0;
+    dom.toggleArchive.hidden = archived.length === 0;
+    dom.toggleArchive.textContent = archiveOpen ? "Arşivi gizle" : `Arşiv (${archived.length})`;
+    dom.archiveList.hidden = !archiveOpen || archived.length === 0;
     dom.list.innerHTML = "";
 
     const planned = todayPlan();
@@ -158,9 +204,28 @@
         const planBtn = document.createElement("button");
         planBtn.className = "task-plan" + (planned.includes(task.id) ? " on" : "");
         planBtn.type = "button";
-        planBtn.textContent = planned.includes(task.id) ? "Planda" : "Bugün";
+        planBtn.textContent = planned.includes(task.id) ? `Planda ${planned.indexOf(task.id) + 1}` : "Bugün";
         planBtn.addEventListener("click", () => togglePlan(task.id));
         actions.appendChild(planBtn);
+
+        if (planned.includes(task.id) && planned.length > 1) {
+          const index = planned.indexOf(task.id);
+          const up = document.createElement("button");
+          up.type = "button";
+          up.className = "plan-move";
+          up.textContent = "↑";
+          up.setAttribute("aria-label", "Planda yukarı taşı");
+          up.disabled = index === 0;
+          up.addEventListener("click", () => movePlan(task.id, -1));
+          const down = document.createElement("button");
+          down.type = "button";
+          down.className = "plan-move";
+          down.textContent = "↓";
+          down.setAttribute("aria-label", "Planda aşağı taşı");
+          down.disabled = index === planned.length - 1;
+          down.addEventListener("click", () => movePlan(task.id, 1));
+          actions.append(up, down);
+        }
 
         const focusBtn = document.createElement("button");
         focusBtn.className = "task-focus";
@@ -169,6 +234,16 @@
         focusBtn.disabled = task.id === s.activeTaskId;
         focusBtn.addEventListener("click", () => setActive(task.id));
         actions.appendChild(focusBtn);
+      } else {
+        const archiveBtn = document.createElement("button");
+        archiveBtn.type = "button";
+        archiveBtn.className = "task-focus";
+        archiveBtn.textContent = "Arşivle";
+        archiveBtn.addEventListener("click", () => {
+          task.archived = true;
+          FF.store.commit();
+        });
+        actions.appendChild(archiveBtn);
       }
 
       const del = document.createElement("button");
@@ -182,6 +257,31 @@
       li.append(check, main, actions);
       dom.list.appendChild(li);
     });
+
+    dom.archiveList.innerHTML = "";
+    archived.forEach((task) => {
+      const li = document.createElement("li");
+      li.className = "task-item completed";
+      const title = document.createElement("span");
+      title.className = "task-text";
+      title.textContent = task.text;
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "task-focus";
+      back.textContent = "Geri al";
+      back.addEventListener("click", () => restore(task.id));
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "task-del";
+      del.textContent = "×";
+      del.setAttribute("aria-label", "Görevi sil");
+      del.addEventListener("click", () => remove(task.id));
+      const actions = document.createElement("div");
+      actions.className = "task-actions";
+      actions.append(back, del);
+      li.append(title, actions);
+      dom.archiveList.appendChild(li);
+    });
   }
 
   function init() {
@@ -193,9 +293,14 @@
       dom.target.value = "1";
       dom.input.focus();
     });
+    dom.archiveDone.addEventListener("click", archiveCompleted);
+    dom.toggleArchive.addEventListener("click", () => {
+      archiveOpen = !archiveOpen;
+      render();
+    });
     render();
     FF.bus.on("change", render);
   }
 
-  FF.tasks = { init, render, add, remove, toggleComplete, setActive, togglePlan };
+  FF.tasks = { init, render, add, remove, toggleComplete, setActive, togglePlan, movePlan, archiveCompleted, restore };
 })();

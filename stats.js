@@ -30,8 +30,18 @@
       historyEmpty: document.getElementById("historyEmpty"),
       heatmap: document.getElementById("heatmap"),
       yearTotal: document.getElementById("yearTotal"),
+      dayDetail: document.getElementById("dayDetail"),
+      dayTitle: document.getElementById("dayDetailTitle"),
+      dayList: document.getElementById("dayDetailList"),
+      dayEmpty: document.getElementById("dayDetailEmpty"),
+      dayRest: document.getElementById("dayRest"),
+      dayClose: document.getElementById("dayDetailClose"),
+      restStatus: document.getElementById("restStatus"),
+      restBtn: document.getElementById("restBtn"),
     };
   }
+
+  let selectedDay = null;
 
   function dateKey(d) {
     const x = new Date(d);
@@ -43,6 +53,13 @@
     const d = new Date(key + "T00:00:00");
     d.setDate(d.getDate() + delta);
     return dateKey(d);
+  }
+
+  function coveredDays() {
+    const days = new Set(FF.store.state.history.map((item) => item.date));
+    const rest = (FF.store.state.rest && FF.store.state.rest.days) || [];
+    rest.forEach((day) => days.add(day));
+    return days;
   }
 
   function computeStreak(dateSet) {
@@ -99,18 +116,20 @@
       const bucket = byDate[key] || { count: 0, minutes: 0 };
       yearMinutes += bucket.minutes;
       const level = heatLevel(bucket.count);
+      const rest = ((FF.store.state.rest && FF.store.state.rest.days) || []).includes(key);
       const label = `${cursor.getDate()} ${MONTHS[cursor.getMonth()]} · ${bucket.count} pomodoro · ${bucket.minutes} dk`;
-      html += `<span class="heat-cell${level ? " l" + level : ""}${key === today ? " today" : ""}" title="${label}"></span>`;
+      html +=
+        `<button type="button" class="heat-cell${level ? " l" + level : ""}${key === today ? " today" : ""}${rest ? " rest" : ""}${key === selectedDay ? " selected" : ""}" data-date="${key}" aria-label="${label}"></button>`;
       cursor.setDate(cursor.getDate() + 1);
     }
     dom.heatmap.innerHTML = html;
+    if (selectedDay) showDay(selectedDay);
     dom.heatmap.setAttribute("aria-label", `Son bir yıl, ${yearMinutes} dakika odaklanma`);
     dom.yearTotal.textContent = `${yearMinutes} dk`;
   }
 
   function currentStreak() {
-    const dateSet = new Set(FF.store.state.history.map((item) => item.date));
-    return computeStreak(dateSet);
+    return computeStreak(coveredDays());
   }
 
   function render() {
@@ -181,11 +200,12 @@
       dom.bestHour.textContent = "—";
     }
 
-    // Seri
-    const dateSet = new Set(history.map((h) => h.date));
+    // Seri (izin günleri boşluğu doldurur)
+    const dateSet = coveredDays();
     const streak = computeStreak(dateSet);
     dom.streakCount.textContent = streak;
     dom.bestStreak.textContent = `${longestStreak(dateSet)} gün`;
+    renderRest();
 
     // Geçmiş (son 20)
     const recent = history.slice().reverse().slice(0, 20);
@@ -215,6 +235,69 @@
     return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  function formatDay(key) {
+    const date = new Date(key + "T12:00:00");
+    return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+  }
+
+  function showDay(key) {
+    selectedDay = key;
+    const sessions = FF.store.state.history.filter((item) => item.date === key);
+    const rest = ((FF.store.state.rest && FF.store.state.rest.days) || []).includes(key);
+    dom.dayDetail.hidden = false;
+    dom.dayTitle.textContent = formatDay(key);
+    dom.dayRest.hidden = !rest;
+    dom.dayEmpty.hidden = sessions.length > 0;
+    dom.dayList.innerHTML = sessions
+      .slice()
+      .reverse()
+      .map((item) => {
+        const task = FF.store.state.tasks.find((entry) => entry.id === item.taskId);
+        const when = new Date(item.ts);
+        const time = `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+        const note = item.note ? `<span class="hist-note">${escapeHtml(item.note)}</span>` : "";
+        return (
+          `<li class="history-item">` +
+          `<span class="hist-dot" aria-hidden="true"></span>` +
+          `<span class="hist-body">` +
+          `<span class="hist-main">${time} · ${item.minutes} dk${task ? ` · ${escapeHtml(task.text)}` : ""}</span>` +
+          note +
+          `</span></li>`
+        );
+      })
+      .join("");
+  }
+
+  function closeDay() {
+    selectedDay = null;
+    dom.dayDetail.hidden = true;
+    dom.heatmap.querySelectorAll(".heat-cell.selected").forEach((cell) => cell.classList.remove("selected"));
+  }
+
+  function renderRest() {
+    const rest = FF.store.state.rest || { credits: 0, days: [] };
+    const today = FF.store.todayKey();
+    const todayRest = rest.days.includes(today);
+    const worked = FF.store.state.history.some((item) => item.date === today);
+    if (todayRest) {
+      dom.restStatus.textContent = "Bugün izin günü. Serin bozulmaz. Hakkın kullanılmazsa en fazla 2'ye kadar ertesi haftaya kalır.";
+      dom.restBtn.textContent = "İzni geri al";
+      dom.restBtn.disabled = false;
+    } else if (worked) {
+      dom.restStatus.textContent = `Bu hafta ${rest.credits} hakkın var. Bugün odaklandığın için izin seçilmez.`;
+      dom.restBtn.textContent = "Bugünü izin yap";
+      dom.restBtn.disabled = true;
+    } else if (rest.credits < 1) {
+      dom.restStatus.textContent = "Bu haftanın izni kullanıldı. Yeni haftada bir hak daha gelir.";
+      dom.restBtn.textContent = "Hak kalmadı";
+      dom.restBtn.disabled = true;
+    } else {
+      dom.restStatus.textContent = `Bu hafta ${rest.credits} hakkın var. Kullanılmazsa bir sonraki haftaya kalır, en fazla 2.`;
+      dom.restBtn.textContent = "Bugünü izin yap";
+      dom.restBtn.disabled = false;
+    }
+  }
+
   function clearHistory() {
     FF.store.state.history = [];
     FF.store.commit();
@@ -226,9 +309,25 @@
     clearBtn.addEventListener("click", () => {
       if (confirm("Tüm oturum geçmişi silinsin mi?")) clearHistory();
     });
+    dom.heatmap.addEventListener("click", (event) => {
+      const cell = event.target.closest("[data-date]");
+      if (!cell) return;
+      showDay(cell.dataset.date);
+      dom.heatmap.querySelectorAll(".heat-cell").forEach((item) => {
+        item.classList.toggle("selected", item.dataset.date === selectedDay);
+      });
+    });
+    dom.dayClose.addEventListener("click", closeDay);
+    dom.restBtn.addEventListener("click", () => {
+      const result = FF.store.toggleRest();
+      if (!result.ok && FF.app) FF.app.toast(result.error);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && selectedDay) closeDay();
+    });
     render();
     FF.bus.on("change", render);
   }
 
-  FF.stats = { init, render, currentStreak };
+  FF.stats = { init, render, currentStreak, closeDay };
 })();

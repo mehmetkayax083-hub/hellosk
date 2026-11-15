@@ -14,9 +14,19 @@
     { cls: "hold-out", label: "Tut" },
   ];
 
+  const TIPS = [
+    "Bir bardak su iç.",
+    "Omuzlarını geriye aç ve esnet.",
+    "Pencereden uzağa, 20 saniye bak.",
+    "Kısa bir tur at.",
+    "Bileklerini ve ellerini gevşet.",
+    "Ayağa kalk, bir kez gerin.",
+  ];
+
   let intervalId = null;
   let breathTimer = null;
   let breathStep = 0;
+  let wakeLock = null;
   let dom = {};
 
   function cache() {
@@ -35,6 +45,7 @@
       breath: document.getElementById("breath"),
       breathBox: document.getElementById("breathBox"),
       breathLabel: document.getElementById("breathLabel"),
+      breathTip: document.getElementById("breathTip"),
     };
   }
 
@@ -87,7 +98,7 @@
 
   function renderActiveTask() {
     const s = FF.store.state;
-    const task = s.tasks.find((x) => x.id === s.activeTaskId && !x.completed);
+    const task = s.tasks.find((x) => x.id === s.activeTaskId && !x.completed && !x.archived);
     if (!task) {
       dom.activeTask.hidden = true;
       return;
@@ -103,7 +114,7 @@
     const order = s.plan && s.plan.date === today ? s.plan.order : [];
     const open = order
       .map((id) => s.tasks.find((task) => task.id === id))
-      .filter((task) => task && !task.completed);
+      .filter((task) => task && !task.completed && !task.archived);
     if (!open.length) {
       dom.planLine.hidden = true;
       return;
@@ -118,6 +129,33 @@
     const step = BREATH[breathStep];
     dom.breathBox.className = "breath-box " + step.cls;
     dom.breathLabel.textContent = step.label;
+    dom.breathTip.textContent = t().tip || "";
+  }
+
+  function pickTip(mode) {
+    if (mode === "focus") return "";
+    return TIPS[Math.floor(Math.random() * TIPS.length)];
+  }
+
+  function acquireWake() {
+    if (!("wakeLock" in navigator)) return;
+    navigator.wakeLock
+      .request("screen")
+      .then((lock) => {
+        wakeLock = lock;
+        lock.addEventListener("release", () => {
+          if (wakeLock === lock) wakeLock = null;
+        });
+      })
+      .catch(() => {
+        wakeLock = null;
+      });
+  }
+
+  function releaseWake() {
+    const lock = wakeLock;
+    wakeLock = null;
+    if (lock) lock.release().catch(() => {});
   }
 
   function syncBreath() {
@@ -163,6 +201,7 @@
       timer.running = false;
       timer.endTime = null;
     }
+    releaseWake();
   }
 
   function start() {
@@ -174,6 +213,7 @@
     timer.endTime = Date.now() + timer.remaining * 1000;
     clearInterval(intervalId);
     intervalId = setInterval(tick, 250);
+    acquireWake();
     render();
     FF.store.save();
   }
@@ -187,6 +227,7 @@
     timer.endTime = null;
     clearInterval(intervalId);
     intervalId = null;
+    releaseWake();
     render();
     FF.store.save();
   }
@@ -201,6 +242,7 @@
     timer.endTime = null;
     clearInterval(intervalId);
     intervalId = null;
+    releaseWake();
     timer.remaining = FF.store.modeSeconds(timer.mode);
     render();
     FF.store.save();
@@ -213,7 +255,9 @@
     clearInterval(intervalId);
     intervalId = null;
     timer.mode = mode;
+    timer.tip = pickTip(mode);
     timer.remaining = FF.store.modeSeconds(mode);
+    releaseWake();
     render();
     FF.store.save();
   }
@@ -254,7 +298,9 @@
     if (finished === "long") timer.cycle = 0;
 
     timer.mode = next;
+    timer.tip = pickTip(next);
     timer.remaining = FF.store.modeSeconds(next);
+    releaseWake();
 
     const shouldAuto =
       (next === "focus" && settings.autoStartPomodoros) ||
@@ -277,12 +323,13 @@
       taskId: s.activeTaskId,
       note: "",
     });
+    if (FF.store.clearRestToday) FF.store.clearRestToday();
     if (s.history.length > FF.store.HISTORY_CAP) s.history = s.history.slice(-FF.store.HISTORY_CAP);
   }
 
   function bumpActiveTask() {
     const s = FF.store.state;
-    const task = s.tasks.find((x) => x.id === s.activeTaskId && !x.completed);
+    const task = s.tasks.find((x) => x.id === s.activeTaskId && !x.completed && !x.archived);
     if (!task) return;
     task.donePomodoros += 1;
     if (task.donePomodoros >= task.targetPomodoros) advancePlan(task.id);
@@ -305,6 +352,9 @@
     cache();
     render();
     FF.bus.on("change", render);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && running()) acquireWake();
+    });
   }
 
   FF.timer = {
@@ -317,5 +367,7 @@
     reset,
     setMode,
     skip: () => setMode(nextModeAfter(t().mode)),
+    hasWakeLock: () => !!wakeLock,
+    TIPS,
   };
 })();

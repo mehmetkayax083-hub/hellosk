@@ -11,12 +11,15 @@
       short: document.getElementById("setShort"),
       long: document.getElementById("setLong"),
       interval: document.getElementById("setInterval"),
+      presets: document.querySelectorAll(".preset-btn"),
       goal: document.getElementById("setGoal"),
       autoBreak: document.getElementById("setAutoBreak"),
       autoPomo: document.getElementById("setAutoPomo"),
       sound: document.getElementById("setSound"),
       volume: document.getElementById("setVolume"),
       notif: document.getElementById("setNotif"),
+      reminder: document.getElementById("setReminder"),
+      reminderTime: document.getElementById("setReminderTime"),
       ambient: document.getElementById("setAmbient"),
       ambientVol: document.getElementById("setAmbientVol"),
       theme: document.getElementById("setTheme"),
@@ -40,6 +43,17 @@
     dom.sound.checked = s.sound;
     dom.volume.value = s.volume;
     dom.notif.checked = s.notifications;
+    dom.reminder.checked = !!(s.reminder && s.reminder.enabled);
+    dom.reminderTime.value = (s.reminder && s.reminder.time) || "09:00";
+    dom.presets.forEach((btn) => {
+      const preset = FF.store.PRESETS[btn.dataset.preset];
+      const on =
+        preset &&
+        preset.focus === s.durations.focus &&
+        preset.short === s.durations.short &&
+        preset.long === s.durations.long;
+      btn.classList.toggle("active", on);
+    });
     dom.ambient.value = s.ambient;
     dom.ambientVol.value = s.ambientVolume;
     dom.theme.checked = s.theme === "dark";
@@ -102,10 +116,28 @@
     });
     dom.volume.addEventListener("change", () => FF.audio.playChime(s().volume));
 
+    dom.presets.forEach((btn) => {
+      btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+    });
+
     dom.notif.addEventListener("change", () => {
       s().notifications = dom.notif.checked;
       if (dom.notif.checked && FF.app) FF.app.requestNotifications();
       FF.store.save();
+    });
+
+    dom.reminder.addEventListener("change", () => {
+      if (!s().reminder) s().reminder = { enabled: false, time: "09:00" };
+      s().reminder.enabled = dom.reminder.checked;
+      if (dom.reminder.checked && FF.app) FF.app.requestNotifications();
+      FF.store.save();
+      if (FF.app) FF.app.checkReminder();
+    });
+    dom.reminderTime.addEventListener("change", () => {
+      if (!s().reminder) s().reminder = { enabled: false, time: "09:00" };
+      s().reminder.time = dom.reminderTime.value || "09:00";
+      FF.store.save();
+      if (FF.app) FF.app.checkReminder();
     });
 
     dom.ambient.addEventListener("change", () => {
@@ -143,6 +175,18 @@
       FF.store.resetAll();
       location.reload();
     });
+  }
+
+  function applyPreset(name) {
+    const preset = FF.store.PRESETS[name];
+    if (!preset) return;
+    const settings = FF.store.state.settings;
+    settings.durations.focus = preset.focus;
+    settings.durations.short = preset.short;
+    settings.durations.long = preset.long;
+    const timer = FF.store.state.timer;
+    if (!timer.running) timer.remaining = FF.store.modeSeconds(timer.mode);
+    FF.store.commit();
   }
 
   function downloadBackup() {

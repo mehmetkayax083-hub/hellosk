@@ -127,6 +127,27 @@
     }
   }
 
+  function checkReminder() {
+    const settings = FF.store.state.settings;
+    const reminder = settings.reminder;
+    if (!reminder || !reminder.enabled) return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const today = FF.store.todayKey();
+    if (FF.store.state.reminderSentOn === today) return;
+    if (FF.store.state.history.some((item) => item.date === today)) return;
+    const parts = String(reminder.time || "09:00").split(":");
+    const target = (Number(parts[0]) || 0) * 60 + (Number(parts[1]) || 0);
+    const now = new Date();
+    if (now.getHours() * 60 + now.getMinutes() < target) return;
+    FF.store.state.reminderSentOn = today;
+    FF.store.save();
+    try {
+      new Notification("Focus Flow", { body: "Bugün henüz bir pomodoro yok. Bir oturum iyi gider." });
+    } catch {
+      /* bildirim engellenmiş olabilir */
+    }
+  }
+
   function notify(finishedMode) {
     const s = FF.store.state.settings;
     if (!s.notifications) return;
@@ -259,6 +280,7 @@
       toast,
       celebrate,
       afterFocusComplete,
+      checkReminder,
     };
 
     window.addEventListener("beforeinstallprompt", (event) => {
@@ -270,6 +292,12 @@
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
     }
+
+    checkReminder();
+    setInterval(checkReminder, 30000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") checkReminder();
+    });
 
     applyTheme();
     dom.body.classList.toggle("focus-mode", FF.store.state.settings.focusMode);

@@ -20,13 +20,22 @@
       palette: "violet",
       dailyGoal: 8,
       focusMode: false,
+      reminder: { enabled: false, time: "09:00" },
     },
     tasks: [],
     activeTaskId: null,
     plan: { date: "", order: [] },
+    rest: { week: "", credits: 1, days: [] },
     goalCelebratedOn: null,
-    timer: { mode: "focus", remaining: 25 * 60, running: false, endTime: null, cycle: 0 },
+    reminderSentOn: null,
+    timer: { mode: "focus", remaining: 25 * 60, running: false, endTime: null, cycle: 0, tip: "" },
     history: [],
+  };
+
+  const PRESETS = {
+    classic: { focus: 25, short: 5, long: 15 },
+    deep: { focus: 50, short: 10, long: 15 },
+    short: { focus: 15, short: 3, long: 10 },
   };
 
   const PALETTES = ["violet", "ocean", "forest"];
@@ -84,6 +93,8 @@
     }
     if (!PALETTES.includes(state.settings.palette)) state.settings.palette = "violet";
     if (!state.plan || state.plan.date !== todayKey()) state.plan = { date: todayKey(), order: [] };
+    if (!state.settings.reminder) state.settings.reminder = { enabled: false, time: "09:00" };
+    settleRest();
     // Çalışır durumdayken sayfa kapanmışsa: geçen süreyi düş.
     const t = state.timer;
     if (t.running && t.endTime) {
@@ -146,6 +157,7 @@
       targetPomodoros: clamp(task.targetPomodoros, 1, 20, 1),
       donePomodoros: Math.max(0, Math.round(Number(task.donePomodoros) || 0)),
       completed: Boolean(task.completed),
+      archived: Boolean(task.archived),
       createdAt: Number(task.createdAt) || Date.now(),
     };
   }
@@ -173,6 +185,8 @@
       activeTaskId: state.activeTaskId,
       plan: state.plan,
       goalCelebratedOn: state.goalCelebratedOn,
+      reminderSentOn: state.reminderSentOn,
+      rest: state.rest,
       timer: { mode: timer.mode, remaining: timer.remaining, cycle: timer.cycle },
       history: state.history,
     };
@@ -199,6 +213,12 @@
     };
     if (next.plan.date !== todayKey()) next.plan = { date: todayKey(), order: [] };
     next.goalCelebratedOn = typeof data.goalCelebratedOn === "string" ? data.goalCelebratedOn : null;
+    next.reminderSentOn = typeof data.reminderSentOn === "string" ? data.reminderSentOn : null;
+    next.rest = {
+      week: typeof data.rest?.week === "string" ? data.rest.week : "",
+      credits: clamp(data.rest && data.rest.credits, 0, 2, 1),
+      days: Array.isArray(data.rest?.days) ? data.rest.days.filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day)) : [],
+    };
 
     const modes = ["focus", "short", "long"];
     const mode = data.timer && modes.includes(data.timer.mode) ? data.timer.mode : "focus";
@@ -210,15 +230,64 @@
     next.timer.remaining = Number.isFinite(remaining) && remaining > 0 ? remaining : next.settings.durations[mode] * 60;
 
     state = next;
+    settleRest();
     save();
     bus.emit("change");
     if (FF.app && FF.app.applyTheme) FF.app.applyTheme();
     return { ok: true };
   }
 
+  function weekStart(key) {
+    const date = new Date(key + "T12:00:00");
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    return todayKey(date);
+  }
+
+  /* Haftada bir izin. Kullanılmazsa bir sonraki haftaya kalır, en fazla 2. */
+  function settleRest() {
+    if (!state.rest || !Array.isArray(state.rest.days)) state.rest = { week: "", credits: 1, days: [] };
+    state.rest.days = state.rest.days.filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day));
+    state.rest.credits = clamp(state.rest.credits, 0, 2, 1);
+    const week = weekStart(todayKey());
+    if (state.rest.week === week) return;
+    const previous = state.rest.week;
+    const used = previous && state.rest.days.some((day) => weekStart(day) === previous);
+    if (!previous) state.rest.credits = Math.max(1, state.rest.credits);
+    else if (!used && state.rest.credits > 0) state.rest.credits = 2;
+    else state.rest.credits = 1;
+    state.rest.week = week;
+  }
+
+  function toggleRest() {
+    settleRest();
+    const today = todayKey();
+    if (state.rest.days.includes(today)) {
+      state.rest.days = state.rest.days.filter((day) => day !== today);
+      state.rest.credits = Math.min(2, state.rest.credits + 1);
+      commit();
+      return { ok: true };
+    }
+    if (state.history.some((item) => item.date === today)) {
+      return { ok: false, error: "Bugün odaklanma var. İzin, çalışılmayan gün içindir." };
+    }
+    if (state.rest.credits < 1) return { ok: false, error: "Bu hafta izin hakkın kalmadı." };
+    state.rest.days.push(today);
+    state.rest.credits -= 1;
+    commit();
+    return { ok: true };
+  }
+
+  function clearRestToday() {
+    const today = todayKey();
+    if (!state.rest || !state.rest.days.includes(today)) return;
+    state.rest.days = state.rest.days.filter((day) => day !== today);
+    state.rest.credits = Math.min(2, state.rest.credits + 1);
+  }
+
   function resetAll() {
     state = clone(DEFAULTS);
     state.plan = { date: todayKey(), order: [] };
+    settleRest();
     save();
   }
 
@@ -229,6 +298,7 @@
     DEFAULTS,
     MOTIVATIONS,
     PALETTES,
+    PRESETS,
     HISTORY_CAP,
     load,
     save,
@@ -236,6 +306,10 @@
     resetAll,
     exportData,
     importData,
+    settleRest,
+    toggleRest,
+    clearRestToday,
+    weekStart,
     modeSeconds,
     todayKey,
     clone,
