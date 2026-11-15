@@ -750,7 +750,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, [data-nav]:focu
 .task-form .task-desc-input,
 .task-form #taskDue,
 .task-form #taskCategory,
-.task-form #newCategory { grid-column: 1 / -1; }
+.task-form #newCategory,
+.task-form #taskCourse,
+.task-form #taskWeekday { grid-column: 1 / -1; }
 .task-filters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
 .task-desc { margin: 6px 0 0; color: var(--muted); font-size: 0.85rem; }
 .task-cat, .task-due { font-size: 0.75rem; color: var(--muted); }
@@ -1020,6 +1022,7 @@ button.heat-cell:hover,
 .install-hint { color: var(--muted); font-size: 0.86rem; line-height: 1.45; padding-top: 8px; }
 .install-btn { margin-top: 12px; }
 .panel-copy { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin-bottom: 14px; }
+.panel .panel-copy:last-child { margin-bottom: 0; }
 .backup-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .btn-line {
   display: inline-flex;
@@ -1103,16 +1106,44 @@ body.text-lg { font-size: 18px; }
 }
 .rate-row button.active { background: linear-gradient(135deg, var(--accent-a), var(--accent-b)); color: #fff; border-color: transparent; }
 .card-face {
-  min-height: 120px;
-  margin: 8px 0 16px;
-  padding: 22px;
+  min-height: 168px;
+  margin: 0 0 16px;
+  padding: 28px 22px;
   border-radius: 18px;
   background: var(--surface-2);
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   line-height: 1.45;
   white-space: pre-wrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
-.card-stage .note-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.card-stage .panel-head { gap: 8px; flex-wrap: wrap; }
+.card-stage .empty { padding: 12px 10px 4px; }
+.card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.card-actions #cardShow { grid-column: 1 / -1; }
+.card-form, .course-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+.course-form { margin-bottom: 16px; }
+.course-card .topic-form { display: flex; align-items: center; gap: 10px; margin: 0; }
+.course-card .topic-form .input { flex: 1; }
+.card-form #cardFront,
+.card-form #cardBack,
+.course-form #courseExam,
+.course-form .btn { grid-column: 1 / -1; }
+.card-form .btn, .course-form #courseGoal { min-width: 120px; }
+@media (max-width: 540px) {
+  .card-form, .course-form { grid-template-columns: 1fr; }
+  .card-form .btn, .course-form #courseGoal { width: 100%; }
+}
 .course-card { margin-bottom: 14px; }
 .topic-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
 .topic-list li { display: flex; align-items: center; gap: 10px; }

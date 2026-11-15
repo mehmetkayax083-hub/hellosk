@@ -121,13 +121,13 @@
         <div class="panel">
           <div class="panel-head"><h2>Bu hafta</h2><span class="panel-note" id="homeWeek"></span></div>
           <p class="panel-copy" id="homeNote"></p>
+          <p class="panel-copy" id="homeCompare"></p>
+          <p class="panel-copy" id="homeHours"></p>
         </div>
         <div class="panel" id="homeWeekPanel">
           <div class="panel-head"><h2>Haftalık program</h2></div>
           <ul class="home-list" id="homeWeekPlan"></ul>
         </div>
-        <p class="panel-copy" id="homeCompare"></p>
-        <p class="panel-copy" id="homeHours"></p>
         <div class="panel">
           <div class="panel-head"><h2>Bu cihaz</h2></div>
           <p class="panel-copy" id="homeRoom">Ortak oda bağlı değil. Burada yalnızca bu cihazdaki çalışma görünür.</p>
@@ -488,7 +488,7 @@
 
       <section class="view" data-view-panel="courses" hidden>
         <header class="view-head"><h1>Dersler</h1><p class="view-sub">Konular, sınav tarihi ve gerçek çalışma süresi</p></header>
-        <form class="task-form" id="courseForm">
+        <form class="course-form" id="courseForm">
           <input class="input" id="courseName" maxlength="60" placeholder="Ders adı" aria-label="Ders adı" required>
           <input class="input num" id="courseGoal" type="number" min="1" max="5000" value="60" aria-label="Hedef dakika">
           <input class="input" id="courseExam" type="date" aria-label="Sınav tarihi">
@@ -514,23 +514,29 @@
 
       <section class="view" data-view-panel="cards" hidden>
         <header class="view-head"><h1>Kartlar</h1><p class="view-sub">Soru ve cevabı çevir, bildiğini sonraki güne ertele</p></header>
-        <p class="panel-copy" id="cardProgress"></p>
-        <form class="note-form" id="cardForm">
-          <input class="input" id="cardFront" maxlength="200" placeholder="Soru" aria-label="Soru" required>
-          <textarea class="input edit-desc" id="cardBack" maxlength="400" rows="3" placeholder="Cevap" aria-label="Cevap" required></textarea>
-          <select class="input" id="cardCourse" aria-label="Ders"></select>
-          <button class="btn btn-primary" type="submit">Kart ekle</button>
-        </form>
         <div class="panel card-stage">
-          <p class="task-cat" id="cardDeck"></p>
+          <div class="panel-head">
+            <h2 id="cardDeck">Tekrar</h2>
+            <span class="panel-note" id="cardProgress"></span>
+          </div>
           <p class="card-face" id="cardFace" hidden></p>
           <p class="empty" id="cardEmpty">Bugün tekrar edilecek kart yok.</p>
-          <div class="note-actions">
+          <div class="card-actions" id="cardActions">
             <button class="btn btn-line" id="cardShow" type="button" hidden>Cevabı göster</button>
             <button class="btn btn-line" id="cardAgain" type="button" hidden>Tekrar et</button>
             <button class="btn btn-primary" id="cardKnew" type="button" hidden>Bildim</button>
           </div>
         </div>
+        <div class="panel">
+          <div class="panel-head"><h2 id="cardFormTitle">Yeni kart</h2></div>
+          <form class="card-form" id="cardForm">
+            <input class="input" id="cardFront" maxlength="200" placeholder="Soru" aria-label="Soru" required>
+            <textarea class="input edit-desc" id="cardBack" maxlength="400" rows="3" placeholder="Cevap" aria-label="Cevap" required></textarea>
+            <select class="input" id="cardCourse" aria-label="Ders"></select>
+            <button class="btn btn-primary" id="cardSave" type="submit">Kart ekle</button>
+          </form>
+        </div>
+        <ul class="task-list" id="cardList"></ul>
       </section>
 
       <!-- AYARLAR -->
